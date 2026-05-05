@@ -1,0 +1,31 @@
+services:
+  alphorn:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://alphorn:${POSTGRES_PASSWORD:-alphorn}@db:5432/alphorn
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: alphorn
+      POSTGRES_DB: alphorn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alphorn}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alphorn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

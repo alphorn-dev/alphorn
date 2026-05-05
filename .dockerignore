@@ -1,0 +1,28 @@
+node_modules
+.next
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.md
+docker-compose.yml
+.env
+.env.*
+!.env.example
+
+# Tests and coverage
+tests
+**/__tests__
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Build artifacts (regenerated inside the image)
+worker.mjs
+tsconfig.tsbuildinfo
+
+# Logs
+*.log

@@ -1,0 +1,103 @@
+{
+  "name": "alphorn",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "description": "Self-hostable notification router. Receive webhooks, route messages to 24+ channels with filtering rules.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alphorn-dev/alphorn.git"
+  },
+  "homepage": "https://alphorn.dev/",
+  "bugs": {
+    "url": "https://github.com/alphorn-dev/alphorn/issues"
+  },
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset",
+    "db:seed": "prisma db seed",
+    "build:worker": "esbuild src/worker/standalone.ts --bundle --platform=node --format=esm --outfile=worker.mjs --alias:@=./src --packages=external --banner:js='import{createRequire}from\"module\";const require=createRequire(import.meta.url);'",
+    "dev:worker": "npx tsx src/worker/standalone.ts",
+    "retention": "npx tsx scripts/retention.ts",
+    "sse-server": "npx tsx src/sse-server/index.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:integration-db": "vitest run --project integration-db",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.4.1",
+    "@paddle/paddle-node-sdk": "^3.8.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@sentry/nextjs": "^10.51.0",
+    "@sentry/node": "^10.51.0",
+    "better-auth": "^1.6.9",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.14.0",
+    "nanoid": "^5.1.11",
+    "next": "16.2.4",
+    "next-themes": "^0.4.6",
+    "nodemailer": "^8.0.7",
+    "pg": "^8.20.0",
+    "pg-boss": "^12.18.2",
+    "pino": "^10.3.1",
+    "prisma": "^7.8.0",
+    "qrcode.react": "^4.2.0",
+    "react": "19.2.5",
+    "react-day-picker": "^9.14.0",
+    "react-dom": "19.2.5",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
+    "remark-breaks": "^4.0.0",
+    "safe-regex2": "^5.1.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
+    "undici": "^8.2.0",
+    "zod": "^4.4.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "prisma",
+      "@prisma/engines",
+      "sharp",
+      "esbuild"
+    ],
+    "ignoredBuiltDependencies": [
+      "@sentry/cli",
+      "msw",
+      "unrs-resolver"
+    ]
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^20.19.39",
+    "@types/nodemailer": "^7.0.11",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.5",
+    "dotenv": "^17.4.2",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.4",
+    "pino-pretty": "^13.1.3",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  }
+}

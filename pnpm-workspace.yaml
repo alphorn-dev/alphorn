@@ -1,0 +1,14 @@
+allowBuilds:
+  ',': true
+  /: true
+  '@': true
+  a: true
+  e: true
+  g: true
+  h: true
+  i: true
+  m: true
+  n: true
+  p: true
+  r: true
+  s: true

@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Better Auth tables (managed by Better Auth + organization plugin)
+// ============================================================
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image            String?
+  twoFactorEnabled Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  sessions    Session[]
+  accounts    Account[]
+  members          Member[]
+  invitations      Invitation[]
+  twoFactors       TwoFactor[]
+  usedInviteLinks  InviteLink[]
+  createdInviteLinks InviteLink[] @relation("inviteLinkCreator")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  activeOrganizationId String?
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+model TwoFactor {
+  id          String  @id
+  secret      String
+  backupCodes String
+  verified    Boolean @default(true)
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model Organization {
+  id        String   @id
+  name      String
+  slug      String?  @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  metadata  String?
+
+  members     Member[]
+  invitations Invitation[]
+  inviteLinks InviteLink[]
+  webhooks    Webhook[]
+  channels    Channel[]
+  settings    OrganizationSettings?
+  subscription Subscription?
+}
+
+model Member {
+  id             String   @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model Invitation {
+  id               String       @id
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email            String
+  role             String?
+  status           String
+  expiresAt        DateTime
+  createdAt        DateTime     @default(now())
+  inviterId        String
+  inviter          User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([inviterId])
+}
+
+model InviteLink {
+  id             String       @id @default(cuid())
+  token          String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  usedAt         DateTime?
+  usedByUserId   String?
+  usedByUser     User?        @relation(fields: [usedByUserId], references: [id], onDelete: SetNull)
+  createdByUserId String
+  createdByUser  User         @relation("inviteLinkCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// Application tables
+// ============================================================
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  STALE
+}
+
+model Webhook {
+  id             String       @id
+  name           String
+  description    String?
+  apiKey         String       @unique
+  publicId       String       @unique
+  requireAuth      Boolean      @default(true)
+  titleTemplate    String?
+  messageTemplate  String?
+  tagsTemplate     String?
+  priorityTemplate String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enabled        Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  // Soft-delete tombstone. When set, the webhook is hidden from list/detail/
+  // edit/receiver paths but its Messages and Deliveries remain so history and
+  // billing aggregates stay intact.
+  deletedAt      DateTime?
+
+  channels WebhookChannel[]
+  messages Message[]
+
+  @@index([organizationId])
+}
+
+model Channel {
+  id             String       @id
+  name           String
+  type           String
+  config         Json
+  publicId       String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enabled        Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  webhooks   WebhookChannel[]
+  deliveries Delivery[]
+
+  @@index([organizationId])
+}
+
+model WebhookChannel {
+  webhookId String
+  channelId String
+  filter    Json?
+  enabled   Boolean @default(true)
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@id([webhookId, channelId])
+}
+
+model Message {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  webhookId String
+  webhook   Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  title     String?
+  message   String
+  priority  Int?
+  tags      String[]
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  deliveries Delivery[]
+
+  @@index([webhookId, createdAt])
+}
+
+model Delivery {
+  id          String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  messageId   String         @db.Uuid
+  message     Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  channelId   String
+  channel     Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  status      DeliveryStatus @default(PENDING)
+  attempts    Int            @default(0)
+  lastError   String?
+  pgbossJobId String?
+  deliveredAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([messageId, createdAt])
+  @@index([channelId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrganizationSettings {
+  id                           String        @id @default(cuid())
+  organizationId               String        @unique
+  organization                 Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  failureNotificationChannelId String?
+  requireTwoFactor             Boolean       @default(false)
+}
+
+model Subscription {
+  id                    String    @id @default(cuid())
+  organizationId        String    @unique
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Paddle identifiers (null for free plan or manual overrides)
+  paddleCustomerId      String?   @unique
+  paddleSubscriptionId  String?   @unique
+
+  // Plan: "free" | "pro" | "business"
+  plan                  String    @default("free")
+  // Status: "active" | "paused" | "cancelled" | "past_due" | "trialing"
+  status                String    @default("active")
+
+  // Current billing period (null for free plan)
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+
+  // Message packs purchased in current period (reset on renewal)
+  purchasedPacks        Int       @default(0)
+
+  // Manual overrides — null = use plan default, -1 = unlimited
+  overrideMessageLimit  Int?
+  overrideWebhookLimit  Int?
+  overrideChannelLimit  Int?
+  overrideRetentionDays Int?
+
+  // Last paddle subscription `updated_at` we applied — used to drop out-of-order webhooks
+  paddleUpdatedAt       DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model PaddleEvent {
+  id          String    @id // Paddle event ID (evt_...)
+  type        String
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+}
+
+// Append-only history of subscription state transitions. Used by the
+// retention job to reason about "when did this org's subscription actually
+// change" — something we cannot reconstruct from Subscription's last-write-wins
+// columns. Never update or delete rows here.
+model SubscriptionEvent {
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organizationId String
+  type           String   // "created" | "reactivated" | "cancelled" | "paused" | "past_due" | "plan_changed"
+  fromPlan       String?
+  toPlan         String?
+  fromStatus     String?
+  toStatus       String?
+  occurredAt     DateTime // Paddle's updatedAt if present, else now()
+  paddleEventId  String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, occurredAt])
+}
