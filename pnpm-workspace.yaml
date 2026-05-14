@@ -1,14 +1,8 @@
 allowBuilds:
-  ',': true
-  /: true
-  '@': true
-  a: true
-  e: true
-  g: true
-  h: true
-  i: true
-  m: true
-  n: true
-  p: true
-  r: true
-  s: true
+  '@prisma/engines': true
+  '@sentry/cli': false
+  esbuild: true
+  msw: false
+  prisma: true
+  sharp: true
+  unrs-resolver: false

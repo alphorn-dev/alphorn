@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # Install dependencies
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml prisma.config.ts ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml prisma.config.ts ./
 COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
