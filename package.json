@@ -43,7 +43,7 @@
     "@prisma/client": "^7.8.0",
     "@sentry/nextjs": "^10.62.0",
     "@sentry/node": "^10.62.0",
-    "better-auth": "^1.6.20",
+    "better-auth": "^1.6.23",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
