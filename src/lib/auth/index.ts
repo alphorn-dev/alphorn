@@ -168,8 +168,8 @@ export const auth = betterAuth({
   plugins: [
     organization({
       ...(mailerReady && {
-        sendInvitationEmail: async ({ email, organization: org, inviter }) => {
-          const acceptUrl = `${requireBaseUrl()}/sign-in`;
+        sendInvitationEmail: async ({ id, email, organization: org, inviter }) => {
+          const acceptUrl = `${requireBaseUrl()}/accept-invitation/${id}`;
           await trySendMail(
             "invitation",
             email,

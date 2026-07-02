@@ -23,6 +23,15 @@ describe("Auth protection", () => {
     expect(res.headers.get("x-pathname")).toBe("/api/health");
   });
 
+  it("treats the invitation acceptance page as public", () => {
+    const req = new NextRequest("https://notifex.test/accept-invitation/inv123");
+
+    const res = proxy(req);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-pathname")).toBe("/accept-invitation/inv123");
+  });
+
   it("treats Better Auth API routes as public", () => {
     const req = new NextRequest("https://notifex.test/api/auth/get-session");
 

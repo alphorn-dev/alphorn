@@ -9,6 +9,7 @@ const publicPaths = [
   "/forgot-password",
   "/reset-password",
   "/invite",
+  "/accept-invitation",
   "/api/auth",
   "/n/",
   "/api/stream/",
