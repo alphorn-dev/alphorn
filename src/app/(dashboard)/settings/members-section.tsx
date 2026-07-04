@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { formatDate } from "@/lib/format-date";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -450,7 +451,7 @@ export function MembersSection({
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(link.createdAt).toLocaleDateString()}
+                        {formatDate(link.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">

@@ -16,6 +16,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { DailyMessageCount, DailyDeliveryStats } from "./actions";
+import { formatShortDate } from "@/lib/format-date";
 
 const messageChartConfig = {
   count: {
@@ -36,9 +37,7 @@ const deliveryChartConfig = {
 } satisfies ChartConfig;
 
 function formatDate(label: unknown) {
-  const dateStr = String(label);
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatShortDate(`${String(label)}T00:00:00`);
 }
 
 export function MessageVolumeChart({

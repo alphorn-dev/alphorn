@@ -28,17 +28,28 @@ export function startRetentionSweep() {
         },
       });
 
+      // Group orgs by their effective retention window so each distinct
+      // window gets a single deleteMany, instead of one per org per sweep.
+      const orgIdsByRetentionDays = new Map<number, string[]>();
       for (const org of orgs) {
         const retentionDays =
           org.subscription?.overrideRetentionDays ??
           getPlanLimits(org.subscription?.plan ?? "free").retentionDays;
+        const orgIds = orgIdsByRetentionDays.get(retentionDays);
+        if (orgIds) {
+          orgIds.push(org.id);
+        } else {
+          orgIdsByRetentionDays.set(retentionDays, [org.id]);
+        }
+      }
 
+      for (const [retentionDays, orgIds] of orgIdsByRetentionDays) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - retentionDays);
 
         const deleted = await prisma.message.deleteMany({
           where: {
-            webhook: { organizationId: org.id },
+            webhook: { organizationId: { in: orgIds } },
             createdAt: { lt: cutoff },
           },
         });
@@ -47,7 +58,7 @@ export function startRetentionSweep() {
           logger.info(
             {
               component: "retention",
-              orgId: org.id,
+              orgCount: orgIds.length,
               deleted: deleted.count,
               retentionDays,
             },

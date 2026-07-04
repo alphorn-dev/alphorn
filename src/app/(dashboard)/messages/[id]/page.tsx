@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { formatDateTime } from "@/lib/format-date";
 
 export default async function MessageDetailPage({
   params,
@@ -37,7 +38,7 @@ export default async function MessageDetailPage({
           <h1 className="text-2xl font-bold tracking-tight">{message.title ?? <span className="text-muted-foreground italic">Untitled</span>}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             via {message.webhook.name} &middot;{" "}
-            {new Date(message.createdAt).toLocaleString()}
+            {formatDateTime(message.createdAt)}
           </p>
         </div>
       </div>

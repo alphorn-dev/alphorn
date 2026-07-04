@@ -2,6 +2,7 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { escapeHtml } from "./utils";
 import { meta } from "./telegram.meta";
 
 const TELEGRAM_MAX_LENGTH = 4096;
@@ -42,10 +43,3 @@ registerChannel({
     await throwIfNotOk(res, "Telegram API");
   },
 });
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

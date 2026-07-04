@@ -16,11 +16,10 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { DailyLatency, ChannelStats, WebhookStats } from "./actions";
+import { formatShortDate } from "@/lib/format-date";
 
 function formatDate(label: unknown) {
-  const dateStr = String(label);
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatShortDate(`${String(label)}T00:00:00`);
 }
 
 function formatLatency(ms: number): string {

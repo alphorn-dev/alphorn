@@ -110,13 +110,11 @@ type QuotaSubscription = Pick<
 >;
 
 // Variant used by the webhook hot path: caller has already loaded the
-// subscription row (usually via a join on the initial webhook fetch) and
-// optionally pre-fetched the message count in parallel. Skipping those two
-// round-trips is the whole point of this overload.
+// subscription row (usually via a join on the initial webhook fetch),
+// skipping that round-trip.
 export async function checkMessageQuotaForSubscription(
   organizationId: string,
   sub: QuotaSubscription,
-  precountedUsage?: Promise<number> | number,
 ): Promise<
   | { allowed: true }
   | { allowed: false; limit: number; usage: number; plan: string }
@@ -126,10 +124,7 @@ export async function checkMessageQuotaForSubscription(
   const limits = limitsForSubscription(sub);
   if (limits.messages === null) return { allowed: true };
 
-  const usage =
-    precountedUsage === undefined
-      ? await countMessagesInPeriod(organizationId, sub.currentPeriodStart)
-      : await precountedUsage;
+  const usage = await countMessagesInPeriod(organizationId, sub.currentPeriodStart);
 
   if (usage < limits.messages) return { allowed: true };
   return { allowed: false, limit: limits.messages, usage, plan: sub.plan };

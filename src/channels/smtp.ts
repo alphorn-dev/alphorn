@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { registerChannel } from "./registry";
 import { PermanentChannelError } from "./errors";
 import { subjectFallback } from "./subject";
+import { escapeHtml } from "./utils";
 import { meta } from "./smtp.meta";
 
 // EAUTH: credentials rejected. EENVELOPE: invalid from/to address.
@@ -75,10 +76,3 @@ registerChannel({
     }
   },
 });
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

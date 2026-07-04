@@ -13,38 +13,20 @@ export interface DeliveryJobData {
 }
 
 export async function handleDelivery(data: DeliveryJobData): Promise<void> {
-  const delivery = await prisma.delivery.findUnique({
-    where: { id: data.deliveryId },
-    include: {
-      channel: true,
-      message: true,
-    },
-  });
-
   const logger = rootLogger.child({
     component: "worker",
     deliveryId: data.deliveryId,
   });
 
-  if (!delivery) {
-    logger.error("Delivery not found");
-    throw new Error(`Delivery ${data.deliveryId} not found`);
-  }
-
-  const jobLogger = logger.child({
-    channelId: delivery.channelId,
-    channelType: delivery.channel.type,
-    messageId: delivery.messageId,
-    attempt: delivery.attempts + 1,
-  });
-
   // Idempotency: only claim PENDING/FAILED rows. A DELIVERED row means the
   // channel already accepted this notification (pg-boss can redeliver after a
   // crash between send success and job ack); a PROCESSING row means another
-  // worker is already handling it. Either way, do not re-send.
+  // worker is already handling it. Either way, do not re-send. Claiming
+  // before loading the full delivery (incl. the message's jsonb payload)
+  // avoids that load on the common already-delivered-redelivery path.
   const claim = await prisma.delivery.updateMany({
     where: {
-      id: delivery.id,
+      id: data.deliveryId,
       status: { in: ["PENDING", "FAILED"] },
     },
     data: {
@@ -54,12 +36,40 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
   });
 
   if (claim.count === 0) {
-    jobLogger.info(
-      { status: delivery.status },
+    const existing = await prisma.delivery.findUnique({
+      where: { id: data.deliveryId },
+      select: { status: true },
+    });
+    if (!existing) {
+      logger.error("Delivery not found");
+      throw new Error(`Delivery ${data.deliveryId} not found`);
+    }
+    logger.info(
+      { status: existing.status },
       "Skipping delivery — not in a claimable state",
     );
     return;
   }
+
+  const delivery = await prisma.delivery.findUnique({
+    where: { id: data.deliveryId },
+    include: {
+      channel: true,
+      message: true,
+    },
+  });
+
+  if (!delivery) {
+    logger.error("Delivery not found after claim");
+    throw new Error(`Delivery ${data.deliveryId} not found`);
+  }
+
+  const jobLogger = logger.child({
+    channelId: delivery.channelId,
+    channelType: delivery.channel.type,
+    messageId: delivery.messageId,
+    attempt: delivery.attempts + 1,
+  });
 
   jobLogger.debug({ channelName: delivery.channel.name }, "Delivery processing");
 

@@ -1,4 +1,5 @@
 import type { ChannelMeta } from "./meta-types";
+import { webhookUrlConfigField } from "./webhook-url-field";
 
 export const meta: ChannelMeta = {
   type: "google-chat",
@@ -17,13 +18,9 @@ export const meta: ChannelMeta = {
     "Give the webhook a name, optionally set an avatar, and copy the webhook URL.",
   ].join("\n"),
   configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
+    webhookUrlConfigField({
       helpText: "From your Google Chat space's webhook settings",
       placeholder: "https://chat.googleapis.com/v1/spaces/.../messages?key=...",
-    },
+    }),
   ],
 };

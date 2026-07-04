@@ -9,7 +9,7 @@ const PriorityCondition = z.object({
 const TagsCondition = z.object({
   field: z.literal("tags"),
   operator: z.enum(["has_any_of", "has_all_of", "has_none_of"]),
-  value: z.array(z.string()).min(1),
+  value: z.array(z.string()).min(1, "Tags condition requires at least one tag"),
 });
 
 const TitleCondition = z.object({
@@ -26,7 +26,7 @@ const MessageCondition = z.object({
 
 const PayloadCondition = z.object({
   field: z.literal("payload"),
-  path: z.string().min(1),
+  path: z.string().trim().min(1, "Payload condition requires a path"),
   operator: z.enum(["equals", "not_equals", "contains", "not_contains", "starts_with", "regex"]),
   value: z.string(),
 });
@@ -119,17 +119,18 @@ export interface ChannelSelection {
   filter: FilterDefinition | null;
 }
 
+/**
+ * UI-facing validation: same rules the FilterDefinition Zod schema already
+ * enforces, surfaced as a "Group N: ..." message for inline display next to
+ * the field, instead of a bare schema-parse error.
+ */
 export function validateFilter(filter: FilterDefinition | null): string | null {
   if (!filter) return null;
-  for (const [gi, group] of filter.groups.entries()) {
-    for (const condition of group.conditions) {
-      if (condition.field === "tags" && condition.value.length === 0) {
-        return `Group ${gi + 1}: Tags condition requires at least one tag`;
-      }
-      if (condition.field === "payload" && !condition.path.trim()) {
-        return `Group ${gi + 1}: Payload condition requires a path`;
-      }
-    }
-  }
-  return null;
+  const result = FilterDefinition.safeParse(filter);
+  if (result.success) return null;
+  const issue = result.error.issues[0];
+  const groupIndex = issue.path[1];
+  return typeof groupIndex === "number"
+    ? `Group ${groupIndex + 1}: ${issue.message}`
+    : issue.message;
 }

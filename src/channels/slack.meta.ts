@@ -1,4 +1,5 @@
 import type { ChannelMeta } from "./meta-types";
+import { webhookUrlConfigField } from "./webhook-url-field";
 
 export const meta: ChannelMeta = {
   type: "slack",
@@ -17,13 +18,9 @@ export const meta: ChannelMeta = {
     "Click **Add New Webhook to Workspace**, select the channel you want notifications in, and click **Allow**. Copy the webhook URL.",
   ].join("\n"),
   configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
+    webhookUrlConfigField({
       helpText: "From your Slack app's Incoming Webhooks settings",
       placeholder: "https://hooks.slack.com/services/...",
-    },
+    }),
   ],
 };

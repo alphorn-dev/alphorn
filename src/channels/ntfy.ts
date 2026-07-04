@@ -3,6 +3,7 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
 import { mapPriorityScale } from "@/lib/filter/schema";
+import { joinUrl } from "./utils";
 import { meta } from "./ntfy.meta";
 
 const NTFY_PRIORITY_SCALE = ["min", "low", "default", "high", "urgent"] as const;
@@ -35,7 +36,7 @@ registerChannel({
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
     const res = await fetchWithTimeout(
-      `${serverUrl.replace(/\/$/, "")}/${topic}`,
+      joinUrl(serverUrl, topic),
       {
         method: "POST",
         headers,

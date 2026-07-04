@@ -2,6 +2,7 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { escapeHtml, joinUrl } from "./utils";
 import { meta } from "./matrix.meta";
 
 const configSchema = z.object({
@@ -16,7 +17,7 @@ registerChannel({
   async send(config, notification) {
     const { homeserverUrl, accessToken, roomId } = config;
     const txnId = crypto.randomUUID();
-    const url = `${homeserverUrl.replace(/\/$/, "")}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`;
+    const url = joinUrl(homeserverUrl, `_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`);
     const res = await fetchWithTimeout(url, {
       method: "PUT",
       headers: {
@@ -37,10 +38,3 @@ registerChannel({
     await throwIfNotOk(res, "Matrix API");
   },
 });
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

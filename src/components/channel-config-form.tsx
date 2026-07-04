@@ -169,31 +169,10 @@ export function ChannelConfigForm({
             )}
           </Label>
 
-          {field.type === "text" && (
+          {(field.type === "text" || field.type === "password" || field.type === "number") && (
             <Input
               id={`field-${field.key}`}
-              value={(values[field.key] as string) || ""}
-              onChange={(e) => setValue(field.key, e.target.value)}
-              placeholder={field.placeholder}
-              required={field.required}
-            />
-          )}
-
-          {field.type === "password" && (
-            <Input
-              id={`field-${field.key}`}
-              type="password"
-              value={(values[field.key] as string) || ""}
-              onChange={(e) => setValue(field.key, e.target.value)}
-              placeholder={field.placeholder}
-              required={field.required}
-            />
-          )}
-
-          {field.type === "number" && (
-            <Input
-              id={`field-${field.key}`}
-              type="number"
+              type={field.type === "text" ? undefined : field.type}
               value={(values[field.key] as string) || ""}
               onChange={(e) => setValue(field.key, e.target.value)}
               placeholder={field.placeholder}

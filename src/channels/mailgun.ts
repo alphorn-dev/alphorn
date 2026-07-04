@@ -3,6 +3,7 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { subjectFallback } from "./subject";
 import { throwIfNotOk } from "./errors";
+import { basicAuthHeader } from "./utils";
 import { meta } from "./mailgun.meta";
 
 const configSchema = z.object({
@@ -26,7 +27,7 @@ registerChannel({
     const res = await fetchWithTimeout(`${baseUrl}/v3/${domain}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`api:${apiKey}`)}`,
+        Authorization: basicAuthHeader("api", apiKey),
       },
       body: new URLSearchParams({
         from,

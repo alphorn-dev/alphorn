@@ -1,12 +1,10 @@
-import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { webhookUrlConfigSchema } from "./utils";
 import { meta } from "./mattermost.meta";
 
-const configSchema = z.object({
-  webhookUrl: z.string().url("Must be a valid URL"),
-});
+const configSchema = webhookUrlConfigSchema();
 
 registerChannel({
   ...meta,

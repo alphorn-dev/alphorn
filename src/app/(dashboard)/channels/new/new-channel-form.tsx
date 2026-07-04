@@ -12,7 +12,7 @@ import { ArrowLeft, Search } from "lucide-react";
 import { ChannelIcon } from "@/components/channel-icons";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
-import { compareHosts } from "@/lib/webhook-loop/same-host";
+import { WebhookHostHint, webhookConflict as isWebhookConflict } from "@/components/webhook-host-hint";
 
 const CATEGORIES: Record<string, string[]> = {
   "Chat & Messaging": ["telegram", "discord", "slack", "teams", "google-chat", "matrix", "mattermost", "rocketchat", "zulip"],
@@ -22,24 +22,6 @@ const CATEGORIES: Record<string, string[]> = {
   "SMS": ["twilio-sms", "vonage-sms"],
   "Other": ["webhook", "sse"],
 };
-
-function WebhookHostHint({ url, appUrl }: { url: string; appUrl: string }) {
-  const host = new URL(appUrl).host;
-  const conflict = Boolean(url) && compareHosts(url, appUrl);
-  return (
-    <div
-      className={`rounded-md border p-3 text-xs ${
-        conflict
-          ? "border-destructive bg-destructive/10 text-destructive"
-          : "border-muted bg-muted/40 text-muted-foreground"
-      }`}
-    >
-      {conflict
-        ? `This URL points at ${host} — the current Alphorn instance. Webhook channels cannot target this server.`
-        : `Note: the URL cannot point at ${host} (this Alphorn instance). Attach channels directly to your webhook to deliver here.`}
-    </div>
-  );
-}
 
 export default function NewChannelForm({ appUrl }: { appUrl: string }) {
   const router = useRouter();
@@ -56,8 +38,7 @@ export default function NewChannelForm({ appUrl }: { appUrl: string }) {
   const webhookConflict =
     selectedType === "webhook" &&
     typeof config.url === "string" &&
-    config.url.length > 0 &&
-    compareHosts(config.url, appUrl);
+    isWebhookConflict(config.url, appUrl);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return handlers;

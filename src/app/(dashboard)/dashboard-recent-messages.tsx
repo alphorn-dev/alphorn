@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDateTime } from "@/lib/format-date";
 import { RefreshCw } from "lucide-react";
 
 interface RecentMessage {
@@ -96,7 +97,7 @@ export function DashboardRecentMessages({
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {new Date(msg.createdAt).toLocaleString()}
+                {formatDateTime(msg.createdAt)}
               </TableCell>
             </TableRow>
           ))}

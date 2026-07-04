@@ -1,4 +1,5 @@
 import type { ChannelMeta } from "./meta-types";
+import { webhookUrlConfigField } from "./webhook-url-field";
 
 export const meta: ChannelMeta = {
   type: "teams",
@@ -17,13 +18,9 @@ export const meta: ChannelMeta = {
     "Follow the prompts to finish the workflow, then copy the generated webhook URL.",
   ].join("\n"),
   configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
+    webhookUrlConfigField({
       helpText: "From your Teams channel or chat workflow webhook",
       placeholder: "https://default<randomid>.environment.api.powerplatform.com:443/...",
-    },
+    }),
   ],
 };

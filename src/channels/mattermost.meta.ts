@@ -1,4 +1,5 @@
 import type { ChannelMeta } from "./meta-types";
+import { webhookUrlConfigField } from "./webhook-url-field";
 
 export const meta: ChannelMeta = {
   type: "mattermost",
@@ -17,13 +18,9 @@ export const meta: ChannelMeta = {
     "Copy the webhook URL provided after creation.",
   ].join("\n"),
   configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
+    webhookUrlConfigField({
       helpText: "From Mattermost: Integrations > Incoming Webhooks",
       placeholder: "https://mattermost.example.com/hooks/...",
-    },
+    }),
   ],
 };

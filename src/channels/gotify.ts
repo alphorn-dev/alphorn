@@ -2,6 +2,7 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { joinUrl } from "./utils";
 import { meta } from "./gotify.meta";
 
 const configSchema = z.object({
@@ -14,7 +15,7 @@ registerChannel({
   configSchema,
   async send(config, notification) {
     const { serverUrl, appToken } = config;
-    const res = await fetchWithTimeout(`${serverUrl.replace(/\/$/, "")}/message`, {
+    const res = await fetchWithTimeout(joinUrl(serverUrl, "message"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

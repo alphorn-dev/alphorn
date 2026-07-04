@@ -4,13 +4,8 @@ import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { logger as rootLogger } from "@/lib/logger";
 import { isSlackPayload, normalizeSlackPayload } from "@/lib/slack-compat";
-import { extractFromPayload } from "@/lib/webhook-extract";
-import {
-  checkMessageQuotaForSubscription,
-  countMessagesInPeriod,
-  limitsForSubscription,
-} from "@/lib/billing/subscription";
-import { isBillingEnabled } from "@/lib/billing/paddle";
+import { extractFromPayload, extractFromText } from "@/lib/webhook-extract";
+import { checkMessageQuotaForSubscription } from "@/lib/billing/subscription";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
 import { getCachedWebhook } from "@/lib/webhook-cache";
 import {
@@ -86,27 +81,11 @@ export async function POST(
     return NextResponse.json({ error: "Loop detected" }, { status: 508 });
   }
 
-  // Kick off the usage count in parallel with body reading so the DB round
-  // trip overlaps with network I/O. Only start it when the plan actually has a
-  // finite message limit — otherwise the count is wasted work and the dangling
-  // promise could surface as an unhandled rejection.
-  const limits = isBillingEnabled()
-    ? limitsForSubscription(webhook.subscription)
-    : null;
-  const usagePromise =
-    limits !== null && limits.messages !== null
-      ? countMessagesInPeriod(
-          webhook.organizationId,
-          webhook.subscription.currentPeriodStart,
-        )
-      : undefined;
-
   // Enforce quota before parsing the body so an over-quota caller can't force
   // us to buffer and parse megabytes of payload we're going to reject anyway.
   const quota = await checkMessageQuotaForSubscription(
     webhook.organizationId,
     webhook.subscription,
-    usagePromise,
   );
   if (!quota.allowed) {
     return NextResponse.json(
@@ -172,47 +151,32 @@ export async function POST(
       );
     }
 
-    if (isSlackPayload(body)) {
-      const normalized = normalizeSlackPayload(body);
-      title = normalized.title;
-      messageText = normalized.message;
-      priority =
-        typeof body.priority === "number" ? Math.round(body.priority) : null;
-      tags = Array.isArray(body.tags)
-        ? body.tags.filter((t): t is string => typeof t === "string")
-        : typeof body.tags === "string"
-          ? [body.tags]
-          : [];
-      payload = body;
-    } else {
-      const headers: Record<string, string> = {};
-      req.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-      const extracted = extractFromPayload({
-        body,
-        headers,
-        templates: {
-          titleTemplate: webhook.titleTemplate,
-          messageTemplate: webhook.messageTemplate,
-          tagsTemplate: webhook.tagsTemplate,
-          priorityTemplate: webhook.priorityTemplate,
-        },
-      });
-      title = extracted.title;
-      messageText = extracted.message;
-      priority = extracted.priority;
-      tags = extracted.tags;
-      payload = body;
-    }
+    const headers: Record<string, string> = {};
+    req.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    const extracted = extractFromPayload({
+      body,
+      headers,
+      templates: {
+        titleTemplate: webhook.titleTemplate,
+        messageTemplate: webhook.messageTemplate,
+        tagsTemplate: webhook.tagsTemplate,
+        priorityTemplate: webhook.priorityTemplate,
+      },
+      fallback: isSlackPayload(body) ? normalizeSlackPayload(body) : undefined,
+    });
+    title = extracted.title;
+    messageText = extracted.message;
+    priority = extracted.priority;
+    tags = extracted.tags;
+    payload = body;
   } else {
-    messageText = rawBody;
-    title = req.headers.get("x-title") || null;
-    const priorityHeader = req.headers.get("x-priority");
-    priority = priorityHeader ? parseInt(priorityHeader, 10) : null;
-    if (priority !== null && isNaN(priority)) priority = null;
-    const tagsHeader = req.headers.get("x-tags");
-    tags = tagsHeader ? tagsHeader.split(",").map((t) => t.trim()).filter(Boolean) : [];
+    const extracted = extractFromText(rawBody, req.headers);
+    title = extracted.title;
+    messageText = extracted.message;
+    priority = extracted.priority;
+    tags = extracted.tags;
     payload = null;
   }
 

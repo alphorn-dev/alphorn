@@ -1,4 +1,5 @@
 import type { ChannelMeta } from "./meta-types";
+import { webhookUrlConfigField } from "./webhook-url-field";
 
 export const meta: ChannelMeta = {
   type: "rocketchat",
@@ -17,13 +18,9 @@ export const meta: ChannelMeta = {
     "Save the integration and copy the **Webhook URL** provided.",
   ].join("\n"),
   configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
+    webhookUrlConfigField({
       helpText: "From Administration > Integrations > Incoming Webhook",
       placeholder: "https://rocketchat.example.com/hooks/...",
-    },
+    }),
   ],
 };

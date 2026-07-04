@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatDate } from "@/lib/format-date";
 import { SquarePen } from "lucide-react";
 
 export default async function ChannelsPage() {
@@ -107,7 +108,7 @@ export default async function ChannelsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {new Date(channel.createdAt).toLocaleDateString()}
+                      {formatDate(channel.createdAt)}
                     </TableCell>
                     {isAdminOrOwner && (
                       <TableCell>

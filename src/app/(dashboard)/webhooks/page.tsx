@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SquarePen } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
 
 export default async function WebhooksPage() {
   const session = await requireSession();
@@ -120,7 +121,7 @@ export default async function WebhooksPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {new Date(webhook.createdAt).toLocaleDateString()}
+                    {formatDate(webhook.createdAt)}
                   </TableCell>
                   {isAdminOrOwner && (
                     <TableCell>

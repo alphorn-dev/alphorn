@@ -31,6 +31,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import { PRIORITY_OPTIONS, PRIORITY_LABELS } from "@/lib/filter/schema";
+import { formatDateTime } from "@/lib/format-date";
 import type { MessageFilters } from "./actions";
 
 interface Message {
@@ -48,15 +50,15 @@ interface Message {
   }[];
 }
 
-const PRIORITY_LABELS: Record<
+const PRIORITY_BADGE_VARIANT: Record<
   number,
-  { label: string; variant: "secondary" | "default" | "outline" | "destructive" }
+  "secondary" | "default" | "outline" | "destructive"
 > = {
-  1: { label: "min", variant: "secondary" },
-  2: { label: "low", variant: "secondary" },
-  3: { label: "default", variant: "outline" },
-  4: { label: "high", variant: "default" },
-  5: { label: "urgent", variant: "destructive" },
+  1: "secondary",
+  2: "secondary",
+  3: "outline",
+  4: "default",
+  5: "destructive",
 };
 
 const DELIVERY_STATUSES: Record<string, string> = {
@@ -346,9 +348,9 @@ export function MessagesTable({
 
         <MultiFilter
           label="All priorities"
-          options={Object.entries(PRIORITY_LABELS).map(([key, { label }]) => ({
-            value: key,
-            label: label.charAt(0).toUpperCase() + label.slice(1),
+          options={PRIORITY_OPTIONS.map(({ value, label }) => ({
+            value: String(value),
+            label,
           }))}
           selected={selectedPriorities}
           onChange={(v) => navigate({ priority: toMulti(v) })}
@@ -420,7 +422,9 @@ export function MessagesTable({
             <TableBody>
               {messages.map((msg) => {
                 const prio =
-                  msg.priority != null ? PRIORITY_LABELS[msg.priority] : null;
+                  msg.priority != null
+                    ? { label: PRIORITY_LABELS[msg.priority], variant: PRIORITY_BADGE_VARIANT[msg.priority] }
+                    : null;
                 return (
                   <TableRow key={msg.id}>
                     <TableCell>
@@ -478,7 +482,7 @@ export function MessagesTable({
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(msg.createdAt).toLocaleString()}
+                      {formatDateTime(msg.createdAt)}
                     </TableCell>
                   </TableRow>
                 );

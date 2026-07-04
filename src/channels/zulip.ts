@@ -2,6 +2,7 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { basicAuthHeader, joinUrl } from "./utils";
 import { meta } from "./zulip.meta";
 
 const configSchema = z.object({
@@ -21,11 +22,11 @@ registerChannel({
       ? `**${notification.title}**\n${notification.message}`
       : notification.message;
     const res = await fetchWithTimeout(
-      `${serverUrl.replace(/\/$/, "")}/api/v1/messages`,
+      joinUrl(serverUrl, "api/v1/messages"),
       {
         method: "POST",
         headers: {
-          Authorization: `Basic ${btoa(`${botEmail}:${apiKey}`)}`,
+          Authorization: basicAuthHeader(botEmail, apiKey),
         },
         body: new URLSearchParams({
           type: "stream",

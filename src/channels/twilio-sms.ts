@@ -2,6 +2,7 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { basicAuthHeader } from "./utils";
 import { meta } from "./twilio-sms.meta";
 
 const configSchema = z.object({
@@ -24,7 +25,7 @@ registerChannel({
       {
         method: "POST",
         headers: {
-          Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+          Authorization: basicAuthHeader(accountSid, authToken),
         },
         body: new URLSearchParams({ To: to, From: from, Body: body }),
       }

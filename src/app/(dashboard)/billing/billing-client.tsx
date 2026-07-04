@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
+import { formatDate } from "@/lib/format-date";
 import {
   Card,
   CardContent,
@@ -296,7 +297,7 @@ export function BillingClient({ data }: { data: BillingData }) {
                 <>
                   {" "}
                   · Current period ends{" "}
-                  {new Date(data.currentPeriodEnd).toLocaleDateString()}
+                  {formatDate(data.currentPeriodEnd)}
                 </>
               )}
             </CardDescription>

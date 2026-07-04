@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
-import { compareHosts } from "@/lib/webhook-loop/same-host";
+import { WebhookHostHint, webhookConflict as isWebhookConflict } from "@/components/webhook-host-hint";
 
 interface ChannelData {
   id: string;
@@ -22,24 +22,6 @@ interface ChannelData {
   config: Record<string, unknown>;
   enabled: boolean;
   publicId: string;
-}
-
-function WebhookHostHint({ url, appUrl }: { url: string; appUrl: string }) {
-  const host = new URL(appUrl).host;
-  const conflict = Boolean(url) && compareHosts(url, appUrl);
-  return (
-    <div
-      className={`rounded-md border p-3 text-xs ${
-        conflict
-          ? "border-destructive bg-destructive/10 text-destructive"
-          : "border-muted bg-muted/40 text-muted-foreground"
-      }`}
-    >
-      {conflict
-        ? `This URL points at ${host} — the current Alphorn instance. Webhook channels cannot target this server.`
-        : `Note: the URL cannot point at ${host} (this Alphorn instance). Attach channels directly to your webhook to deliver here.`}
-    </div>
-  );
 }
 
 export default function EditChannelForm({
@@ -79,8 +61,7 @@ export default function EditChannelForm({
   const webhookConflict =
     initialChannel.type === "webhook" &&
     typeof config.url === "string" &&
-    config.url.length > 0 &&
-    compareHosts(config.url, appUrl);
+    isWebhookConflict(config.url, appUrl);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
