@@ -3,6 +3,10 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { subjectFallback } from "./subject";
 import { throwIfNotOk } from "./errors";
+import { mapPriorityScale } from "@/lib/filter/schema";
+import { meta } from "./opsgenie.meta";
+
+const OPSGENIE_PRIORITY_SCALE = ["P5", "P4", "P3", "P2", "P1"] as const;
 
 const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
@@ -11,60 +15,11 @@ const configSchema = z.object({
 });
 
 registerChannel({
-  type: "opsgenie",
-  displayName: "Opsgenie",
-  description: "Create alerts in Opsgenie",
-  icon: "opsgenie",
+  ...meta,
   configSchema,
-  configFields: [
-    {
-      key: "apiKey",
-      label: "API Key",
-      type: "password",
-      required: true,
-      helpText:
-        "From Settings > Integration List > API > Add. Use a 'Create and Close' API integration.",
-    },
-    {
-      key: "region",
-      label: "Region",
-      type: "select",
-      required: true,
-      helpText: "Your Opsgenie instance region",
-      options: [
-        { label: "US (api.opsgenie.com)", value: "us" },
-        { label: "EU (api.eu.opsgenie.com)", value: "eu" },
-      ],
-    },
-    {
-      key: "priority",
-      label: "Default Priority",
-      type: "select",
-      required: true,
-      helpText: "Default priority for created alerts",
-      options: [
-        { label: "P1 - Critical", value: "P1" },
-        { label: "P2 - High", value: "P2" },
-        { label: "P3 - Moderate", value: "P3" },
-        { label: "P4 - Low", value: "P4" },
-        { label: "P5 - Informational", value: "P5" },
-      ],
-    },
-  ],
   async send(config, notification) {
-    const { apiKey, region, priority } = configSchema.parse(config);
-    const ogPriority =
-      notification.priority != null
-        ? notification.priority >= 5
-          ? "P1"
-          : notification.priority >= 4
-            ? "P2"
-            : notification.priority >= 3
-              ? "P3"
-              : notification.priority >= 2
-                ? "P4"
-                : "P5"
-        : priority;
+    const { apiKey, region, priority } = config;
+    const ogPriority = mapPriorityScale(notification.priority, OPSGENIE_PRIORITY_SCALE, priority);
 
     const baseUrl =
       region === "eu"
@@ -86,8 +41,10 @@ registerChannel({
     });
     await throwIfNotOk(res, "Opsgenie");
   },
+  // Custom test: real Opsgenie alerts need to be closed, so the test
+  // message tells the user they can safely close it.
   async test(config) {
-    const { apiKey, region, priority } = configSchema.parse(config);
+    const { apiKey, region, priority } = config;
     const baseUrl =
       region === "eu"
         ? "https://api.eu.opsgenie.com"

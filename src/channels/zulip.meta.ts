@@ -1,0 +1,60 @@
+import type { ChannelMeta } from "./meta-types";
+
+export const meta: ChannelMeta = {
+  type: "zulip",
+  displayName: "Zulip",
+  description: "Send notifications to a Zulip stream",
+  icon: "zulip",
+  hasTest: true,
+  setupGuide: [
+    "**Step 1: Create a bot**",
+    "In Zulip, click on your **User Profile**, go to **Settings** > **Bots** > **Add a new bot**. Choose **Incoming webhook** type.",
+    "",
+    "**Step 2: Copy credentials**",
+    "Copy the bot's **email address** and **API key**.",
+    "",
+    "**Step 3: Choose a stream and topic**",
+    "Pick the stream (channel) and topic where notifications should be posted.",
+  ].join("\n"),
+  configFields: [
+    {
+      key: "serverUrl",
+      label: "Server URL",
+      type: "text",
+      required: true,
+      helpText: "Your Zulip server URL",
+      placeholder: "https://yourorg.zulipchat.com",
+    },
+    {
+      key: "botEmail",
+      label: "Bot Email",
+      type: "text",
+      required: true,
+      helpText: "The bot's email address from Settings > Your Bots",
+      placeholder: "my-bot@yourorg.zulipchat.com",
+    },
+    {
+      key: "apiKey",
+      label: "API Key",
+      type: "password",
+      required: true,
+      helpText: "The bot's API key from Settings > Your Bots",
+    },
+    {
+      key: "stream",
+      label: "Stream",
+      type: "text",
+      required: true,
+      helpText: "The stream (channel) to post to",
+      placeholder: "general",
+    },
+    {
+      key: "topic",
+      label: "Topic",
+      type: "text",
+      required: true,
+      helpText: "The topic within the stream",
+      placeholder: "notifications",
+    },
+  ],
+};

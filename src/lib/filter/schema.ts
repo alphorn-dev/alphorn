@@ -94,6 +94,23 @@ export const PRIORITY_LABELS: Record<number, string> = Object.fromEntries(
   PRIORITY_OPTIONS.map((p) => [p.value, p.label])
 );
 
+/**
+ * Map our 1-5 priority scale (see PRIORITY_OPTIONS) onto a channel's own
+ * scale. `scale` gives the target value for priorities 1..5 in order —
+ * repeat a value to bucket adjacent priorities together (e.g. a 4-level
+ * severity scale collapses Min/Low into the same bucket). Channels with a
+ * 1:1 mapping (e.g. ntfy) just list five distinct values.
+ */
+export function mapPriorityScale<T>(
+  priority: number | null | undefined,
+  scale: readonly [T, T, T, T, T],
+  fallback: T
+): T {
+  if (priority == null) return fallback;
+  const index = Math.min(5, Math.max(1, Math.round(priority))) - 1;
+  return scale[index];
+}
+
 export const FILTER_FIELDS = ["priority", "tags", "title", "message", "payload"] as const;
 export type FilterField = (typeof FILTER_FIELDS)[number];
 

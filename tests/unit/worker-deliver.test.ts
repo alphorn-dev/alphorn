@@ -113,7 +113,7 @@ describe("handleDelivery", () => {
     mocks.findDelivery.mockResolvedValue(makeDelivery({ status: "DELIVERED" }));
     mocks.updateManyDelivery.mockResolvedValue({ count: 0 });
     const send = vi.fn();
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
 
     const { handleDelivery } = await import("@/worker/deliver");
     await handleDelivery({ deliveryId: "del_1" });
@@ -126,7 +126,7 @@ describe("handleDelivery", () => {
   it("sends the notification and marks the delivery delivered", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
     mocks.findDelivery.mockResolvedValue(makeDelivery());
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({});
 
     const { handleDelivery } = await import("@/worker/deliver");
@@ -169,7 +169,7 @@ describe("handleDelivery", () => {
         },
       })
     );
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({});
 
     const { handleDelivery } = await import("@/worker/deliver");
@@ -196,7 +196,7 @@ describe("handleDelivery", () => {
     const send = vi.fn().mockRejectedValue(error);
 
     mocks.findDelivery.mockResolvedValue(makeDelivery({ attempts: 1 }));
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({ attempts: 2 });
 
     const { handleDelivery } = await import("@/worker/deliver");
@@ -219,7 +219,7 @@ describe("handleDelivery", () => {
     const send = vi.fn().mockRejectedValue(error);
 
     mocks.findDelivery.mockResolvedValue(makeDelivery({ attempts: 4 }));
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({ attempts: 5 });
 
     const { handleDelivery } = await import("@/worker/deliver");
@@ -236,7 +236,7 @@ describe("handleDelivery", () => {
     const send = vi.fn().mockRejectedValue(error);
 
     mocks.findDelivery.mockResolvedValue(makeDelivery({ attempts: 0 }));
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({ attempts: 1 });
 
     const { handleDelivery } = await import("@/worker/deliver");
@@ -260,7 +260,7 @@ describe("handleDelivery", () => {
     const send = vi.fn().mockRejectedValue("bad");
 
     mocks.findDelivery.mockResolvedValue(makeDelivery({ attempts: 1 }));
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
     mocks.updateDelivery.mockResolvedValue({ attempts: 2 });
 
     const { handleDelivery } = await import("@/worker/deliver");

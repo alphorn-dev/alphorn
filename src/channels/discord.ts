@@ -2,35 +2,17 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { meta } from "./discord.meta";
 
 const configSchema = z.object({
   webhookUrl: z.string().url("Must be a valid URL").startsWith("https://discord.com/api/webhooks/", "Must be a Discord webhook URL"),
 });
 
 registerChannel({
-  type: "discord",
-  displayName: "Discord",
-  description: "Send notifications to a Discord channel via webhook",
-  icon: "discord",
-  setupGuide: [
-    "1. Open your Discord server settings",
-    "2. Go to **Integrations** > **Webhooks**",
-    "3. Click **New Webhook** and select the target channel",
-    "4. Copy the webhook URL",
-  ].join("\n"),
+  ...meta,
   configSchema,
-  configFields: [
-    {
-      key: "webhookUrl",
-      label: "Webhook URL",
-      type: "text",
-      required: true,
-      helpText: "Found in Server Settings > Integrations > Webhooks",
-      placeholder: "https://discord.com/api/webhooks/...",
-    },
-  ],
   async send(config, notification) {
-    const { webhookUrl } = configSchema.parse(config);
+    const { webhookUrl } = config;
     const res = await fetchWithTimeout(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,8 +29,9 @@ registerChannel({
     });
     await throwIfNotOk(res, "Discord webhook");
   },
+  // Custom test: uses a distinct green accent color instead of the default send() blue.
   async test(config) {
-    const { webhookUrl } = configSchema.parse(config);
+    const { webhookUrl } = config;
     const res = await fetchWithTimeout(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -24,7 +24,10 @@ describe("channel registry", () => {
   it("registerChannel + getChannel round-trip", () => {
     const handler = fakeHandler("test-ch-1");
     registerChannel(handler);
-    expect(getChannel("test-ch-1")).toBe(handler);
+    expect(getChannel("test-ch-1")).toMatchObject({
+      type: "test-ch-1",
+      displayName: "TEST-CH-1",
+    });
   });
 
   it("getChannel returns undefined for unknown type", () => {
@@ -35,7 +38,7 @@ describe("channel registry", () => {
     const handler = fakeHandler("test-ch-2");
     registerChannel(handler);
     const all = getAllChannels();
-    expect(all).toContain(handler);
+    expect(all.some((h) => h.type === handler.type)).toBe(true);
   });
 
   it("getChannelTypes includes registered type", () => {
@@ -48,6 +51,16 @@ describe("channel registry", () => {
     const h2 = fakeHandler("test-ch-overwrite");
     registerChannel(h1);
     registerChannel(h2);
-    expect(getChannel("test-ch-overwrite")).toBe(h2);
+    expect(getChannel("test-ch-overwrite")?.description).toBe(h2.description);
+  });
+
+  it("a channel that omits test() gets a default send()-based test()", () => {
+    registerChannel(fakeHandler("test-ch-default-test"));
+    expect(getChannel("test-ch-default-test")?.test).toBeInstanceOf(Function);
+  });
+
+  it("a channel that explicitly sets test: undefined has no test()", () => {
+    registerChannel({ ...fakeHandler("test-ch-no-test"), test: undefined });
+    expect(getChannel("test-ch-no-test")?.test).toBeUndefined();
   });
 });

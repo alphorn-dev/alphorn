@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
 import { publish } from "@/lib/sse/connection-registry";
 import { formatSseEvent, type SseConfig } from "@/lib/sse/format";
+import { meta } from "./sse.meta";
 
 const configSchema = z.object({
   format: z.enum(["json", "text"]).default("json"),
@@ -13,50 +14,14 @@ const configSchema = z.object({
 });
 
 registerChannel({
-  type: "sse",
-  displayName: "Live Stream (SSE)",
-  description: "Stream notifications in real-time via Server-Sent Events",
-  icon: "sse",
+  ...meta,
   configSchema,
-  configFields: [
-    {
-      key: "format",
-      label: "Output Format",
-      type: "select",
-      required: true,
-      default: "json",
-      helpText: "JSON sends structured data, Text sends a human-readable line",
-      options: [
-        { label: "JSON", value: "json" },
-        { label: "Plain Text", value: "text" },
-      ],
-    },
-    {
-      key: "includePriority",
-      label: "Include Priority",
-      type: "switch",
-      helpText: "Include the priority field in streamed events",
-    },
-    {
-      key: "includeTags",
-      label: "Include Tags",
-      type: "switch",
-      helpText: "Include the tags field in streamed events",
-    },
-    {
-      key: "includePayload",
-      label: "Include Payload",
-      type: "switch",
-      helpText: "Include the full payload in streamed events",
-    },
-  ],
   async send(config, notification, context) {
-    const parsed = configSchema.parse(config);
     const sseConfig: SseConfig = {
-      format: parsed.format,
-      includePriority: parsed.includePriority,
-      includeTags: parsed.includeTags,
-      includePayload: parsed.includePayload,
+      format: config.format,
+      includePriority: config.includePriority,
+      includeTags: config.includeTags,
+      includePayload: config.includePayload,
     };
 
     if (process.env.SSE_MODE === "standalone" && process.env.SSE_SERVER_URL) {
@@ -77,4 +42,7 @@ registerChannel({
       publish(context.channelId, event);
     }
   },
+  // No test: a live stream only means something to a client already
+  // connected via EventSource/curl, so a "send a test" button isn't useful.
+  test: undefined,
 });

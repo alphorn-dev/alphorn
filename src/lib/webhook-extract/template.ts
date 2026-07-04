@@ -4,16 +4,7 @@
  * write logic into templates. Missing paths render as empty string.
  */
 
-export function resolvePath(obj: unknown, path: string): unknown {
-  const segments = path.split(".");
-  let current: unknown = obj;
-  for (const segment of segments) {
-    if (current === null || current === undefined) return undefined;
-    if (typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[segment];
-  }
-  return current;
-}
+import { resolvePath } from "@/lib/safe-path";
 
 const PLACEHOLDER = /\{(\$?[a-zA-Z0-9_.]+)\}/g;
 

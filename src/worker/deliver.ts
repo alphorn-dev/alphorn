@@ -85,7 +85,8 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
   };
 
   try {
-    await handler.send(delivery.channel.config, notification, {
+    const config = handler.configSchema.parse(delivery.channel.config);
+    await handler.send(config, notification, {
       channelId: delivery.channelId,
       deliveryId: delivery.id,
       trace: data.trace,

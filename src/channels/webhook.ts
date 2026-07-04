@@ -4,6 +4,7 @@ import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk, PermanentChannelError } from "./errors";
 import { compareHosts } from "@/lib/webhook-loop/same-host";
 import { TRACE_HEADER, signTrace } from "@/lib/webhook-loop/hops";
+import { meta } from "./webhook.meta";
 
 const SAME_HOST_ERROR =
   "Webhook channels can't point at this Alphorn instance. Use a channel directly on your webhook instead.";
@@ -26,40 +27,10 @@ const configSchema = z.object({
 });
 
 registerChannel({
-  type: "webhook",
-  displayName: "Webhook",
-  description: "Send notifications to any HTTP endpoint",
-  icon: "webhook",
+  ...meta,
   configSchema,
-  configFields: [
-    {
-      key: "url",
-      label: "Endpoint URL",
-      type: "text",
-      required: true,
-      helpText:
-        "The URL that will receive POST/PUT requests. It cannot point at this Alphorn instance — to deliver to a webhook here, attach channels directly to that webhook.",
-      placeholder: "https://api.example.com/notifications",
-    },
-    {
-      key: "method",
-      label: "HTTP Method",
-      type: "select",
-      required: true,
-      options: [
-        { label: "POST", value: "POST" },
-        { label: "PUT", value: "PUT" },
-      ],
-    },
-    {
-      key: "headers",
-      label: "Custom Headers",
-      type: "keyvalue",
-      helpText: "Additional HTTP headers to send with the request (e.g. Authorization)",
-    },
-  ],
   async send(config, notification, context) {
-    const { url, method, headers } = configSchema.parse(config);
+    const { url, method, headers } = config;
     if (compareHosts(url, getAppUrl())) {
       throw new PermanentChannelError(SAME_HOST_ERROR);
     }
@@ -86,8 +57,10 @@ registerChannel({
     });
     await throwIfNotOk(res, "Webhook");
   },
+  // Custom test: sends a distinct payload shape (title/body/_test flag) so
+  // receivers can tell a test ping apart from a real notification.
   async test(config) {
-    const { url, method, headers } = configSchema.parse(config);
+    const { url, method, headers } = config;
     if (compareHosts(url, getAppUrl())) {
       throw new PermanentChannelError(SAME_HOST_ERROR);
     }

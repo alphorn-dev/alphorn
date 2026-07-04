@@ -1,5 +1,6 @@
 import type { FilterDefinition, FilterCondition } from "./schema";
 import isSafeRegex from "safe-regex2";
+import { resolvePath } from "@/lib/safe-path";
 
 export interface FilterMessage {
   title: string | null;
@@ -119,18 +120,6 @@ function evaluateString(
     default:
       return false;
   }
-}
-
-const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
-function resolvePath(obj: unknown, path: string): unknown {
-  return path.split(".").reduce<unknown>((current, key) => {
-    if (BLOCKED_KEYS.has(key)) return undefined;
-    if (current !== null && typeof current === "object" && Object.prototype.hasOwnProperty.call(current, key)) {
-      return (current as Record<string, unknown>)[key];
-    }
-    return undefined;
-  }, obj);
 }
 
 function evaluatePayload(

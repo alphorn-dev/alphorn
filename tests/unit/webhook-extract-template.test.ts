@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { resolveTemplate, resolvePath } from "@/lib/webhook-extract/template";
+import { resolveTemplate } from "@/lib/webhook-extract/template";
+import { resolvePath } from "@/lib/safe-path";
 
 describe("resolvePath", () => {
   it("returns undefined for missing path", () => {

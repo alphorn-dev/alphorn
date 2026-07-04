@@ -39,15 +39,15 @@ export interface DeliveryContext {
   trace?: string[];
 }
 
-export interface ChannelHandler {
+export interface ChannelHandler<TConfig = unknown> {
   type: string;
   displayName: string;
   description: string;
   icon: string;
   setupGuide?: string;
-  configSchema: z.ZodObject<z.ZodRawShape>;
+  configSchema: z.ZodType<TConfig>;
   configFields: ConfigField[];
   oauth?: OAuthConfig;
-  send(config: unknown, notification: Notification, context: DeliveryContext): Promise<void>;
-  test?(config: unknown): Promise<void>;
+  send(config: TConfig, notification: Notification, context: DeliveryContext): Promise<void>;
+  test?(config: TConfig): Promise<void>;
 }
