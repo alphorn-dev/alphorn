@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { showError } from "@/lib/toast-error";
+import { sanitizeRedirect } from "@/lib/utils";
 
 export default function Verify2FAPage() {
   return (
@@ -27,7 +28,8 @@ export default function Verify2FAPage() {
 function Verify2FAForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam ? sanitizeRedirect(redirectParam) : null;
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [useBackupCode, setUseBackupCode] = useState(false);

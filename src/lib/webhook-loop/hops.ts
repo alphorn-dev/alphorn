@@ -40,6 +40,11 @@ export function signTrace(trace: string[]): string {
   return `${payload}.${sig}`;
 }
 
+/** Outbound loop-tracking header carrying the signed trace of upstream hops. */
+export function traceHeaders(trace: string[] | undefined): Record<string, string> {
+  return { [TRACE_HEADER]: signTrace(trace ?? []) };
+}
+
 export function verifyTrace(token: string | null | undefined): string[] | null {
   if (!token) return null;
   const idx = token.indexOf(".");

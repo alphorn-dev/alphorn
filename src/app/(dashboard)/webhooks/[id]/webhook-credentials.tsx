@@ -14,24 +14,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export function WebhookCredentials({
   webhookId,
-  apiKey: initialApiKey,
+  apiKeyPrefix,
   endpointUrl: initialEndpointUrl,
   requireAuth: initialRequireAuth,
 }: {
   webhookId: string;
-  apiKey: string;
+  apiKeyPrefix: string;
   endpointUrl: string;
   requireAuth: boolean;
 }) {
-  const [apiKey, setApiKey] = useState(initialApiKey);
+  // The full key only exists in memory right after regenerate — it is never
+  // stored, so once this reveal is gone the user must regenerate again.
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [endpointUrl, setEndpointUrl] = useState(initialEndpointUrl);
   const [requireAuth, setRequireAuth] = useState(initialRequireAuth);
-  const [showKey, setShowKey] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [regeneratingUrl, setRegeneratingUrl] = useState(false);
 
@@ -39,7 +40,7 @@ export function WebhookCredentials({
     setRegenerating(true);
     try {
       const newKey = await regenerateApiKey(webhookId);
-      setApiKey(newKey);
+      setRevealedKey(newKey);
       toast.success("API key regenerated");
     } catch {
       toast.error("Failed to regenerate API key");
@@ -130,33 +131,41 @@ export function WebhookCredentials({
         {requireAuth && (
           <div className="space-y-2">
             <Label>API Key</Label>
-            <div className="flex gap-2">
-              <Input
-                value={showKey ? apiKey : "alp_" + "*".repeat(40)}
-                readOnly
-                className="font-mono text-sm"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowKey(!showKey)}
-                title={showKey ? "Hide" : "Show"}
-              >
-                {showKey ? (
-                  <EyeOff data-icon />
-                ) : (
-                  <Eye data-icon />
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => copyToClipboard(apiKey)}
-                title="Copy"
-              >
-                <Copy data-icon />
-              </Button>
-            </div>
+            {revealedKey ? (
+              <>
+                <div className="flex gap-2">
+                  <Input
+                    value={revealedKey}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(revealedKey)}
+                    title="Copy"
+                  >
+                    <Copy data-icon />
+                  </Button>
+                </div>
+                <p className="text-sm text-warning">
+                  Copy this key now — it is shown only once and cannot be
+                  retrieved later.
+                </p>
+              </>
+            ) : (
+              <>
+                <Input
+                  value={apiKeyPrefix + "…"}
+                  readOnly
+                  className="font-mono text-sm"
+                />
+                <p className="text-sm text-muted-foreground">
+                  The full key is shown only once, when created. Regenerate to
+                  get a new key.
+                </p>
+              </>
+            )}
             <ConfirmDialog
               trigger={
                 <Button variant="destructive" size="sm" disabled={regenerating}>

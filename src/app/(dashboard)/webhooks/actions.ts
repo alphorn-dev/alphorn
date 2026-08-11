@@ -3,7 +3,13 @@
 import { prisma } from "@/lib/db";
 import { requireSession, requireOrgSession, requireAdminOrOwner } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
-import { generateApiKey, generatePublicId, generateWebhookId } from "@/lib/api-key";
+import {
+  generateApiKey,
+  generatePublicId,
+  generateWebhookId,
+  hashApiKey,
+  apiKeyPrefix,
+} from "@/lib/api-key";
 import { revalidatePath } from "next/cache";
 import { FilterDefinition as FilterDefinitionSchema } from "@/lib/filter/schema";
 import type { FilterDefinition } from "@/lib/filter/schema";
@@ -47,11 +53,20 @@ export async function getWebhooksForOrg() {
   const orgId = session.session.activeOrganizationId;
   if (!orgId) return [];
 
+  // Never ship key material (apiKeyHash) or channel configs (credentials) to
+  // the list view — it only renders names, counts, and status.
   return prisma.webhook.findMany({
     where: { organizationId: orgId, deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      enabled: true,
+      createdAt: true,
       channels: {
-        include: { channel: true },
+        select: {
+          channelId: true,
+          channel: { select: { name: true } },
+        },
       },
       _count: { select: { messages: true } },
     },
@@ -62,11 +77,29 @@ export async function getWebhooksForOrg() {
 export async function getWebhookById(id: string) {
   const { orgId } = await requireOrgSession();
 
+  // apiKeyPrefix is safe to display; apiKeyHash and channel configs are not
+  // shipped to the client (the detail page is visible to any org member).
   return prisma.webhook.findFirst({
     where: { id, organizationId: orgId, deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      enabled: true,
+      requireAuth: true,
+      apiKeyPrefix: true,
+      publicId: true,
+      titleTemplate: true,
+      messageTemplate: true,
+      tagsTemplate: true,
+      priorityTemplate: true,
       channels: {
-        include: { channel: true },
+        select: {
+          channelId: true,
+          enabled: true,
+          filter: true,
+          channel: { select: { id: true, name: true, type: true } },
+        },
       },
     },
   });
@@ -107,12 +140,14 @@ export async function createWebhook(data: {
     priorityTemplate: data.priorityTemplate ?? null,
   });
 
+  const apiKey = generateApiKey();
   const webhook = await prisma.webhook.create({
     data: {
       id: generateWebhookId(),
       name: data.name,
       description: data.description || null,
-      apiKey: generateApiKey(),
+      apiKeyHash: hashApiKey(apiKey),
+      apiKeyPrefix: apiKeyPrefix(apiKey),
       publicId: generatePublicId(),
       requireAuth: data.requireAuth ?? true,
       organizationId: orgId,
@@ -130,7 +165,9 @@ export async function createWebhook(data: {
   });
 
   revalidatePath("/webhooks");
-  return webhook;
+  // Return the plaintext key once — it is never recoverable from the DB after
+  // this. The caller shows it to the user and discards it.
+  return { id: webhook.id, apiKey };
 }
 
 export async function updateWebhook(
@@ -216,13 +253,15 @@ export async function regenerateApiKey(id: string) {
   });
   if (!existing) throw new Error("Webhook not found");
 
-  const webhook = await prisma.webhook.update({
+  const apiKey = generateApiKey();
+  await prisma.webhook.update({
     where: { id },
-    data: { apiKey: generateApiKey() },
+    data: { apiKeyHash: hashApiKey(apiKey), apiKeyPrefix: apiKeyPrefix(apiKey) },
   });
 
   revalidatePath("/webhooks");
-  return webhook.apiKey;
+  // Plaintext returned once; only the hash is persisted.
+  return apiKey;
 }
 
 export async function updateWebhookRequireAuth(id: string, requireAuth: boolean) {

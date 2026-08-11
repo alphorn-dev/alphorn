@@ -16,16 +16,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { DailyLatency, ChannelStats, WebhookStats } from "./actions";
-import { formatShortDate } from "@/lib/format-date";
-
-function formatDate(label: unknown) {
-  return formatShortDate(`${String(label)}T00:00:00`);
-}
-
-function formatLatency(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+import { formatChartDate, formatLatency } from "@/lib/format-date";
 
 const latencyChartConfig = {
   avgMs: {
@@ -49,7 +40,7 @@ export function LatencyChart({ data }: { data: DailyLatency[] }) {
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
-          tickFormatter={formatDate}
+          tickFormatter={formatChartDate}
           tickLine={false}
           axisLine={false}
           tickMargin={8}
@@ -63,7 +54,7 @@ export function LatencyChart({ data }: { data: DailyLatency[] }) {
         <ChartTooltip
           content={
             <ChartTooltipContent
-              labelFormatter={formatDate}
+              labelFormatter={formatChartDate}
               formatter={(value) => formatLatency(value as number)}
             />
           }
@@ -84,11 +75,11 @@ export function LatencyChart({ data }: { data: DailyLatency[] }) {
 const channelChartConfig = {
   delivered: {
     label: "Delivered",
-    color: "oklch(0.65 0.17 155)",
+    color: "var(--success)",
   },
   failed: {
     label: "Failed",
-    color: "oklch(0.65 0.2 25)",
+    color: "var(--destructive)",
   },
 } satisfies ChartConfig;
 
@@ -117,13 +108,13 @@ export function TopChannelsChart({ data }: { data: ChannelStats[] }) {
         <ChartTooltip content={<ChartTooltipContent />} />
         <Bar
           dataKey="delivered"
-          fill="oklch(0.65 0.17 155)"
+          fill="var(--success)"
           radius={[0, 4, 4, 0]}
           stackId="channel"
         />
         <Bar
           dataKey="failed"
-          fill="oklch(0.65 0.2 25)"
+          fill="var(--destructive)"
           radius={[0, 4, 4, 0]}
           stackId="channel"
         />

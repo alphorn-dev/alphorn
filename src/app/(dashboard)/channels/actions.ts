@@ -13,16 +13,25 @@ export async function getChannelsForOrg() {
   const orgId = session.session.activeOrganizationId;
   if (!orgId) return [];
 
+  // Never return config to members — it holds channel credentials (bot tokens,
+  // SMTP passwords, API keys) and this list is shipped to the browser. The
+  // config-bearing read (getChannelById) is admin-gated below.
   return prisma.channel.findMany({
     where: { organizationId: orgId },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      enabled: true,
+      createdAt: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 }
 
 export async function getChannelById(id: string) {
-  const session = await requireSession();
-  const orgId = session.session.activeOrganizationId;
-  if (!orgId) return null;
+  // Returns the full row including config (credentials) — admin/owner only.
+  const { orgId } = await requireAdminOrOwner();
 
   return prisma.channel.findFirst({
     where: { id, organizationId: orgId },

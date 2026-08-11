@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getChannel: vi.fn(),
   notifyFailure: vi.fn(),
   loggerChild: vi.fn(),
+  enforceRateLimit: vi.fn(),
+  queueInsert: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -17,6 +19,21 @@ vi.mock("@/lib/db", () => ({
       updateMany: mocks.updateManyDelivery,
     },
   },
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  enforceRateLimit: mocks.enforceRateLimit,
+  RateLimitError: class RateLimitError extends Error {
+    constructor(public readonly retryAfterMs: number) {
+      super("Rate limit exceeded");
+      this.name = "RateLimitError";
+    }
+  },
+}));
+
+vi.mock("@/lib/queue", () => ({
+  getQueue: async () => ({ insert: mocks.queueInsert }),
+  DELIVERY_QUEUE: "delivery",
 }));
 
 vi.mock("@/channels", () => ({
@@ -70,6 +87,8 @@ describe("handleDelivery", () => {
     mocks.updateManyDelivery.mockReset().mockResolvedValue({ count: 1 });
     mocks.getChannel.mockReset();
     mocks.notifyFailure.mockReset();
+    mocks.enforceRateLimit.mockReset().mockResolvedValue(undefined);
+    mocks.queueInsert.mockReset().mockResolvedValue(undefined);
   });
 
   it("throws when the delivery record does not exist", async () => {
@@ -93,7 +112,8 @@ describe("handleDelivery", () => {
     expect(mocks.updateManyDelivery).toHaveBeenCalledWith({
       where: {
         id: "del_1",
-        status: { in: ["PENDING", "FAILED"] },
+        status: { in: ["PENDING", "FAILED", "STALE"] },
+        createdAt: { gte: expect.any(Date) },
       },
       data: {
         status: "PROCESSING",
@@ -107,6 +127,34 @@ describe("handleDelivery", () => {
         lastError: "Unknown channel type: slack",
       },
     });
+    expect(mocks.notifyFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "del_1" })
+    );
+  });
+
+  it("releases the claim and reschedules without sending when the channel is throttled", async () => {
+    mocks.findDelivery.mockResolvedValue(makeDelivery()); // channel type "slack" is rate-limited
+    const send = vi.fn();
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
+    mocks.updateDelivery.mockResolvedValue({});
+    const { RateLimitError } = await import("@/lib/rate-limit");
+    mocks.enforceRateLimit.mockRejectedValue(new RateLimitError(3000));
+
+    const { handleDelivery } = await import("@/worker/deliver");
+    await handleDelivery({ deliveryId: "del_1", trace: ["pub_1"] });
+
+    // Not sent, not failed.
+    expect(send).not.toHaveBeenCalled();
+    expect(mocks.notifyFailure).not.toHaveBeenCalled();
+    // Claim released: back to PENDING, attempt increment undone.
+    expect(mocks.updateDelivery).toHaveBeenCalledWith({
+      where: { id: "del_1" },
+      data: { status: "PENDING", attempts: { decrement: 1 } },
+    });
+    // Rescheduled with a delay, preserving the trace.
+    expect(mocks.queueInsert).toHaveBeenCalledWith("delivery", [
+      { data: { deliveryId: "del_1", trace: ["pub_1"] }, startAfter: 3 },
+    ]);
   });
 
   it("skips the delivery when the claim finds no eligible row", async () => {
@@ -121,6 +169,50 @@ describe("handleDelivery", () => {
     expect(send).not.toHaveBeenCalled();
     expect(mocks.updateDelivery).not.toHaveBeenCalled();
     expect(mocks.notifyFailure).not.toHaveBeenCalled();
+  });
+
+  it("claims STALE deliveries created within the last 24 hours and delivers", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-08T12:00:00Z"));
+    try {
+      const send = vi.fn().mockResolvedValue(undefined);
+      mocks.findDelivery.mockResolvedValue(makeDelivery({ status: "STALE" }));
+      mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
+      mocks.updateDelivery.mockResolvedValue({});
+
+      const { handleDelivery } = await import("@/worker/deliver");
+      await handleDelivery({ deliveryId: "del_1" });
+
+      expect(mocks.updateManyDelivery).toHaveBeenCalledWith({
+        where: {
+          id: "del_1",
+          status: { in: ["PENDING", "FAILED", "STALE"] },
+          createdAt: { gte: new Date("2026-04-07T12:00:00.000Z") },
+        },
+        data: {
+          status: "PROCESSING",
+          attempts: { increment: 1 },
+        },
+      });
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not send when the claim excludes a delivery older than 24 hours", async () => {
+    // The 24h bound lives in the claim's where clause, so the DB matches no
+    // row for an expired delivery and the worker skips it.
+    mocks.updateManyDelivery.mockResolvedValue({ count: 0 });
+    mocks.findDelivery.mockResolvedValue(makeDelivery({ status: "STALE" }));
+    const send = vi.fn();
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
+
+    const { handleDelivery } = await import("@/worker/deliver");
+    await handleDelivery({ deliveryId: "del_1" });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(mocks.updateDelivery).not.toHaveBeenCalled();
   });
 
   it("sends the notification and marks the delivery delivered", async () => {
@@ -227,7 +319,9 @@ describe("handleDelivery", () => {
       handleDelivery({ deliveryId: "del_1" })
     ).resolves.toBeUndefined();
 
-    expect(mocks.notifyFailure).toHaveBeenCalledWith("del_1");
+    expect(mocks.notifyFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "del_1" })
+    );
   });
 
   it("does not retry permanent channel errors and notifies immediately", async () => {
@@ -246,12 +340,48 @@ describe("handleDelivery", () => {
     ).resolves.toBeUndefined();
 
     expect(send).toHaveBeenCalledTimes(1);
-    expect(mocks.notifyFailure).toHaveBeenCalledWith("del_1");
+    expect(mocks.notifyFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "del_1" })
+    );
     expect(mocks.updateDelivery).toHaveBeenLastCalledWith({
       where: { id: "del_1" },
       data: {
         status: "FAILED",
         lastError: "message too long",
+      },
+    });
+  });
+
+  it("treats a ZodError from the config schema as permanent and notifies without retrying", async () => {
+    const { z } = await import("zod");
+    const configSchema = z.object({ token: z.string() });
+    const send = vi.fn();
+
+    mocks.findDelivery.mockResolvedValue(
+      makeDelivery({
+        attempts: 0,
+        channel: { id: "ch_1", type: "slack", name: "Slack", config: {} },
+      })
+    );
+    mocks.getChannel.mockReturnValue({ configSchema, send });
+    mocks.updateDelivery.mockResolvedValue({ attempts: 1 });
+
+    const { handleDelivery } = await import("@/worker/deliver");
+
+    await expect(
+      handleDelivery({ deliveryId: "del_1" })
+    ).resolves.toBeUndefined();
+
+    // parse fails before send, no retry (resolves, not rejects), and notifies
+    expect(send).not.toHaveBeenCalled();
+    expect(mocks.notifyFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "del_1" })
+    );
+    expect(mocks.updateDelivery).toHaveBeenLastCalledWith({
+      where: { id: "del_1" },
+      data: {
+        status: "FAILED",
+        lastError: expect.stringContaining("Invalid channel config"),
       },
     });
   });

@@ -63,6 +63,13 @@ export function normalizeSlackPayload(body: Record<string, unknown>): Normalized
   return { title, message };
 }
 
+// Array entries come from an untrusted payload and can be anything at runtime
+// (e.g. `blocks: [null]`) despite the SlackPayload cast — skip non-objects
+// before dereferencing their fields.
+function isObject(value: unknown): boolean {
+  return typeof value === "object" && value !== null;
+}
+
 function extractText(slack: SlackPayload): string | undefined {
   return typeof slack.text === "string" && slack.text ? slack.text : undefined;
 }
@@ -71,7 +78,7 @@ function extractBlockText(slack: SlackPayload): string | undefined {
   if (!Array.isArray(slack.blocks)) return undefined;
 
   const texts = slack.blocks
-    .filter((b) => b.type === "section" && typeof b.text?.text === "string")
+    .filter((b) => isObject(b) && b.type === "section" && typeof b.text?.text === "string")
     .map((b) => b.text!.text!);
 
   return texts.length > 0 ? texts.join("\n") : undefined;
@@ -81,7 +88,10 @@ function extractAttachmentText(slack: SlackPayload): string | undefined {
   if (!Array.isArray(slack.attachments)) return undefined;
 
   for (const att of slack.attachments) {
-    const text = att.fallback || att.text || att.pretext;
+    if (!isObject(att)) continue;
+    const text = [att.fallback, att.text, att.pretext].find(
+      (v) => typeof v === "string" && v
+    );
     if (text) return text;
   }
   return undefined;
@@ -91,6 +101,7 @@ function extractAttachmentTitle(slack: SlackPayload): string | undefined {
   if (!Array.isArray(slack.attachments)) return undefined;
 
   for (const att of slack.attachments) {
+    if (!isObject(att)) continue;
     if (typeof att.title === "string" && att.title) return att.title;
   }
   return undefined;

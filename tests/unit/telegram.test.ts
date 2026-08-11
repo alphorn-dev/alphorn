@@ -52,7 +52,7 @@ describe("telegram channel", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.text.length).toBeLessThanOrEqual(4096);
-    expect(body.text).toMatch(/\[truncated\]$/);
+    expect(body.text).toMatch(/…$/);
     expect(body.text.startsWith("<b>T</b>\n")).toBe(true);
   });
 

@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
-import { throwIfNotOk } from "./errors";
+import { PermanentChannelError, throwIfNotOk } from "./errors";
 import { meta } from "./vonage-sms.meta";
+
+// Vonage per-message statuses that retries can't fix: 2 missing params,
+// 3 invalid params, 4 invalid credentials, 15 illegal sender.
+const VONAGE_PERMANENT_STATUSES = ["2", "3", "4", "15"];
 
 const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
@@ -34,10 +38,13 @@ registerChannel({
     const data = (await res.json()) as {
       messages: Array<{ status: string; "error-text"?: string }>;
     };
-    if (data.messages?.[0]?.status !== "0") {
-      throw new Error(
-        `Vonage error: ${data.messages?.[0]?.["error-text"] ?? "Unknown error"}`
-      );
+    const status = data.messages?.[0]?.status;
+    if (status !== "0") {
+      const msg = `Vonage error: ${data.messages?.[0]?.["error-text"] ?? "Unknown error"}`;
+      if (status != null && VONAGE_PERMANENT_STATUSES.includes(status)) {
+        throw new PermanentChannelError(msg);
+      }
+      throw new Error(msg);
     }
   },
 });

@@ -54,7 +54,7 @@ export default async function WebhookDetailPage({
       <div className="mt-6 space-y-6">
         <WebhookCredentials
           webhookId={webhook.id}
-          apiKey={webhook.requireAuth ? webhook.apiKey : ""}
+          apiKeyPrefix={webhook.apiKeyPrefix}
           endpointUrl={endpointUrl}
           requireAuth={webhook.requireAuth}
         />
@@ -67,7 +67,6 @@ export default async function WebhookDetailPage({
 
         <WebhookExamples
           endpointUrl={endpointUrl}
-          apiKey={webhook.requireAuth ? webhook.apiKey : ""}
           requireAuth={webhook.requireAuth}
         />
       </div>

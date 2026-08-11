@@ -66,9 +66,20 @@ function findString(
   return null;
 }
 
+/**
+ * Clamps a raw numeric priority into the canonical 1-5 scale (see
+ * PRIORITY_OPTIONS in @/lib/filter/schema). Out-of-range values (e.g.
+ * 2147483648, which would overflow the DB int column) are rounded in;
+ * non-finite input yields null.
+ */
+export function clampPriority(raw: number): number | null {
+  if (!Number.isFinite(raw)) return null;
+  return Math.min(5, Math.max(1, Math.round(raw)));
+}
+
 function extractPriority(body: Record<string, unknown>): number | null {
   const raw = body.priority;
-  return typeof raw === "number" ? Math.round(raw) : null;
+  return typeof raw === "number" ? clampPriority(raw) : null;
 }
 
 function extractTags(body: Record<string, unknown>): string[] {

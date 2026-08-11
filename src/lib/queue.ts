@@ -9,6 +9,12 @@ function createBoss(): PgBoss {
   if (!globalForPgBoss.pgBoss) {
     globalForPgBoss.pgBoss = new PgBoss({
       connectionString: process.env.DATABASE_URL!,
+      // LISTEN/NOTIFY wakes workers on new jobs instead of polling every ~2s,
+      // giving sub-second pickup with near-zero idle DB load. Requires the
+      // delivery queue's notify:true (see src/worker/index.ts). Holds one
+      // dedicated LISTEN connection — incompatible with PgBouncer transaction
+      // pooling; self-hosters behind such a pooler get polling regardless.
+      useListenNotify: true,
     });
   }
   return globalForPgBoss.pgBoss;

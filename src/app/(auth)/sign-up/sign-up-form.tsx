@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { showError } from "@/lib/toast-error";
+import { sanitizeRedirect } from "@/lib/utils";
 
 function GitHubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -62,7 +63,8 @@ const providerIcons: Record<string, (props: React.SVGProps<SVGSVGElement>) => Re
 export function SignUpForm({ providers }: { providers: EnabledProvider[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam ? sanitizeRedirect(redirectParam) : null;
   const hasInvite = redirectTo?.startsWith("/invite/");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

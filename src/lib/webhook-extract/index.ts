@@ -1,5 +1,5 @@
 import { resolveTemplate } from "./template";
-import { extractHeuristic } from "./heuristic";
+import { clampPriority, extractHeuristic } from "./heuristic";
 
 interface WebhookTemplates {
   titleTemplate: string | null;
@@ -77,8 +77,7 @@ function parseTags(value: string): string[] {
 }
 
 function parsePriority(value: string): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
+  return clampPriority(Number(value));
 }
 
 function truncate(value: string, max: number): string {
@@ -131,8 +130,7 @@ export function extractFromText(
 ): ExtractResult {
   const title = headers.get("x-title") || null;
   const priorityHeader = headers.get("x-priority");
-  let priority = priorityHeader ? parseInt(priorityHeader, 10) : null;
-  if (priority !== null && Number.isNaN(priority)) priority = null;
+  const priority = priorityHeader ? clampPriority(parseInt(priorityHeader, 10)) : null;
   const tagsHeader = headers.get("x-tags");
   const tags = tagsHeader ? parseTags(tagsHeader) : [];
 

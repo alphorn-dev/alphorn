@@ -9,7 +9,7 @@ export interface CachedWebhook {
   id: string;
   organizationId: string;
   publicId: string;
-  apiKey: string;
+  apiKeyHash: string;
   requireAuth: boolean;
   enabled: boolean;
   titleTemplate: string | null;
@@ -51,9 +51,26 @@ const NOTIFY_CHANNEL = "alphorn_cache_invalidate";
 const globalForCache = globalThis as unknown as {
   webhookCache?: Map<string, CacheEntry>;
   webhookCacheListener?: ListenerState;
+  webhookCacheGenerations?: GenerationState;
 };
 
 const cache = (globalForCache.webhookCache ??= new Map<string, CacheEntry>());
+
+// Invalidation generations close a lost-update race in getCachedWebhook: a
+// NOTIFY arriving between its DB read and cache.set would delete nothing (the
+// entry isn't cached yet) and the stale pre-update row would then be cached
+// for a full TTL. Fetches capture the generations before the DB read and skip
+// caching when either changed. The per-publicId map is cleared on full flush
+// (the global bump already invalidates its captures), which keeps it bounded.
+interface GenerationState {
+  global: number;
+  byPublicId: Map<string, number>;
+}
+
+const generations = (globalForCache.webhookCacheGenerations ??= {
+  global: 0,
+  byPublicId: new Map<string, number>(),
+});
 
 interface ListenerState {
   client: Client | null;
@@ -74,6 +91,8 @@ function getListenerState(): ListenerState {
 // Flush the entire cache. Used when the invalidation scope is broader than a
 // single webhook (channel/subscription/webhook-channel edits, listener errors).
 function flushCache(reason: string): void {
+  generations.global++;
+  generations.byPublicId.clear();
   if (cache.size === 0) return;
   logger.debug(
     { component: "webhook-cache", reason, size: cache.size },
@@ -86,6 +105,12 @@ function flushCache(reason: string): void {
 // payloads, which cover the common case of a direct webhook edit (rename,
 // toggle, template change, soft-delete).
 function invalidatePublicId(publicId: string, reason: string): void {
+  // Bump even when nothing is cached yet: a fetch may be in flight and must
+  // see this invalidation via the generation check in getCachedWebhook.
+  generations.byPublicId.set(
+    publicId,
+    (generations.byPublicId.get(publicId) ?? 0) + 1,
+  );
   if (!cache.delete(publicId)) return;
   logger.debug(
     { component: "webhook-cache", reason, publicId },
@@ -200,7 +225,7 @@ async function fetchWebhook(publicId: string): Promise<CachedWebhook | null> {
     id: row.id,
     organizationId: row.organizationId,
     publicId: row.publicId,
-    apiKey: row.apiKey,
+    apiKeyHash: row.apiKeyHash,
     requireAuth: row.requireAuth,
     enabled: row.enabled,
     titleTemplate: row.titleTemplate,
@@ -258,14 +283,24 @@ export async function getCachedWebhook(
     cache.delete(publicId);
   }
 
+  // Capture generations before the read so an invalidation racing the fetch
+  // is detected below — the row we get back may predate the update.
+  const globalGen = generations.global;
+  const publicIdGen = generations.byPublicId.get(publicId) ?? 0;
+
   const value = await fetchWebhook(publicId);
 
-  if (cache.size >= MAX_CACHE_ENTRIES) {
-    // Drop the oldest insertion — Map preserves insertion order.
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
+  if (
+    generations.global === globalGen &&
+    (generations.byPublicId.get(publicId) ?? 0) === publicIdGen
+  ) {
+    if (cache.size >= MAX_CACHE_ENTRIES) {
+      // Drop the oldest insertion — Map preserves insertion order.
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(publicId, { value, fetchedAt: now });
   }
-  cache.set(publicId, { value, fetchedAt: now });
   return value;
 }
 
@@ -280,6 +315,8 @@ export function flushWebhookCache(): void {
 // from a clean slate.
 export function _resetWebhookCacheForTests(): void {
   cache.clear();
+  generations.global = 0;
+  generations.byPublicId.clear();
   const state = globalForCache.webhookCacheListener;
   if (state?.client) {
     void state.client.end().catch(() => {});

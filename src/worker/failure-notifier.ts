@@ -3,28 +3,24 @@ import { getChannel } from "@/channels";
 import { logger as rootLogger } from "@/lib/logger";
 
 /**
+ * The failed delivery, already loaded by the caller with its channel and the
+ * message's webhook name. Passed in to avoid a redundant refetch.
+ */
+export interface FailedDelivery {
+  id: string;
+  channelId: string;
+  attempts: number;
+  lastError: string | null;
+  channel: { name: string; type: string; organizationId: string };
+  message: { title: string | null; webhook: { name: string } };
+}
+
+/**
  * Check if the organization has a failure notification channel configured.
  * If so, send a failure alert.
  */
-export async function notifyFailure(deliveryId: string): Promise<void> {
-  const logger = rootLogger.child({ component: "worker", deliveryId });
-
-  const delivery = await prisma.delivery.findUnique({
-    where: { id: deliveryId },
-    include: {
-      channel: true,
-      message: {
-        include: {
-          webhook: true,
-        },
-      },
-    },
-  });
-
-  if (!delivery) {
-    logger.warn("Delivery not found for failure notification");
-    return;
-  }
+export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
+  const logger = rootLogger.child({ component: "worker", deliveryId: delivery.id });
 
   const orgId = delivery.channel.organizationId;
   const settings = await prisma.organizationSettings.findUnique({
@@ -49,7 +45,12 @@ export async function notifyFailure(deliveryId: string): Promise<void> {
   if (!handler) return;
 
   try {
-    await handler.send(failureChannel.config, {
+    // Parse first so the failure channel gets the same Zod defaults/coercion
+    // every other send path applies (mirrors deliver.ts). A parse failure or
+    // unknown handler is swallowed by the catch — a broken failure channel
+    // must not crash the delivery that triggered this notification.
+    const config = handler.configSchema.parse(failureChannel.config);
+    await handler.send(config, {
       title: "Delivery failed",
       message: [
         `Webhook: ${delivery.message.webhook.name}`,
@@ -60,7 +61,7 @@ export async function notifyFailure(deliveryId: string): Promise<void> {
       ].join("\n"),
     }, {
       channelId: failureChannel.id,
-      deliveryId: deliveryId,
+      deliveryId: delivery.id,
     });
     logger.info(
       { failureChannelId: failureChannel.id, failureChannelType: failureChannel.type },

@@ -288,14 +288,14 @@ function buildExamples(
 
 export function WebhookExamples({
   endpointUrl,
-  apiKey,
   requireAuth,
 }: {
   endpointUrl: string;
-  apiKey: string;
   requireAuth: boolean;
 }) {
-  const examples = buildExamples(endpointUrl, apiKey, requireAuth);
+  // The real key is never available here (stored hashed, shown once on create).
+  // Examples use a placeholder the user substitutes with their key.
+  const examples = buildExamples(endpointUrl, "YOUR_API_KEY", requireAuth);
 
   return (
     <Card>

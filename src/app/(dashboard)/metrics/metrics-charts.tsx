@@ -16,7 +16,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { DailyMessageCount, DailyDeliveryStats } from "./actions";
-import { formatShortDate } from "@/lib/format-date";
+import { formatChartDate } from "@/lib/format-date";
 
 const messageChartConfig = {
   count: {
@@ -28,17 +28,13 @@ const messageChartConfig = {
 const deliveryChartConfig = {
   delivered: {
     label: "Delivered",
-    color: "oklch(0.65 0.17 155)",
+    color: "var(--success)",
   },
   failed: {
     label: "Failed",
-    color: "oklch(0.65 0.2 25)",
+    color: "var(--destructive)",
   },
 } satisfies ChartConfig;
-
-function formatDate(label: unknown) {
-  return formatShortDate(`${String(label)}T00:00:00`);
-}
 
 export function MessageVolumeChart({
   data,
@@ -51,14 +47,14 @@ export function MessageVolumeChart({
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
-          tickFormatter={formatDate}
+          tickFormatter={formatChartDate}
           tickLine={false}
           axisLine={false}
           tickMargin={8}
         />
         <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
         <ChartTooltip
-          content={<ChartTooltipContent labelFormatter={formatDate} />}
+          content={<ChartTooltipContent labelFormatter={formatChartDate} />}
         />
         <Area
           dataKey="count"
@@ -84,24 +80,24 @@ export function DeliveryStatusChart({
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
-          tickFormatter={formatDate}
+          tickFormatter={formatChartDate}
           tickLine={false}
           axisLine={false}
           tickMargin={8}
         />
         <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
         <ChartTooltip
-          content={<ChartTooltipContent labelFormatter={formatDate} />}
+          content={<ChartTooltipContent labelFormatter={formatChartDate} />}
         />
         <Bar
           dataKey="delivered"
-          fill="oklch(0.65 0.17 155)"
+          fill="var(--success)"
           radius={[4, 4, 0, 0]}
           stackId="deliveries"
         />
         <Bar
           dataKey="failed"
-          fill="oklch(0.65 0.2 25)"
+          fill="var(--destructive)"
           radius={[4, 4, 0, 0]}
           stackId="deliveries"
         />

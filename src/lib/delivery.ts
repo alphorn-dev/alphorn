@@ -8,6 +8,9 @@ export interface PersistMessageInput {
   priority: number | null;
   tags: string[];
   payload: Record<string, unknown> | null;
+  // Pre-serialized payload (e.g. the receiver's raw request body) to skip a
+  // redundant re-stringify on the hot path. Must be JSON equal to `payload`.
+  payloadJson?: string;
   channelIds: string[];
   trace?: string[];
 }
@@ -21,7 +24,7 @@ export async function persistMessageAndEnqueueDeliveries(
   // Warm the queue client while we write so its start-up overlaps with the DB.
   const queuePromise = channelIds.length > 0 ? getQueue() : null;
 
-  const payloadJson = JSON.stringify(payload ?? {});
+  const payloadJson = input.payloadJson ?? JSON.stringify(payload ?? {});
 
   // One round-trip: insert the Message and all Deliveries via a CTE, and
   // return both the message id and the freshly-minted delivery ids. This

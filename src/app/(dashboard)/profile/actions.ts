@@ -10,31 +10,6 @@ import {
   type EmailChangeValidationResult,
 } from "./email-change-validation";
 
-export type EmailTakenResult =
-  | { ok: true; taken: boolean }
-  | { ok: false; reason: "rate_limited"; retryAfterSec: number };
-
-export async function isEmailTaken(email: string): Promise<EmailTakenResult> {
-  const session = await requireSession();
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return { ok: true, taken: false };
-
-  try {
-    await enforceRateLimit(`app:isEmailTaken:${session.user.id}`, 10, 60_000);
-  } catch (err) {
-    if (err instanceof RateLimitError) {
-      return { ok: false, reason: "rate_limited", retryAfterSec: Math.ceil(err.retryAfterMs / 1000) };
-    }
-    throw err;
-  }
-
-  const existing = await prisma.user.findUnique({
-    where: { email: normalized },
-    select: { id: true },
-  });
-  return { ok: true, taken: existing !== null };
-}
-
 export type RequestEmailChangeResult =
   | { ok: true }
   | { ok: false; reason: "rate_limited"; retryAfterSec: number }

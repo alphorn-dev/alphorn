@@ -2,7 +2,12 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
+import { truncate } from "./truncate";
 import { meta } from "./discord.meta";
+
+// Discord embed limits: title 256 chars, description 4096 chars.
+const DISCORD_TITLE_MAX = 256;
+const DISCORD_DESCRIPTION_MAX = 4096;
 
 const configSchema = z.object({
   webhookUrl: z.string().url("Must be a valid URL").startsWith("https://discord.com/api/webhooks/", "Must be a Discord webhook URL"),
@@ -19,8 +24,8 @@ registerChannel({
       body: JSON.stringify({
         embeds: [
           {
-            title: notification.title ?? undefined,
-            description: notification.message,
+            title: notification.title != null ? truncate(notification.title, DISCORD_TITLE_MAX) : undefined,
+            description: truncate(notification.message, DISCORD_DESCRIPTION_MAX),
             color: 0x5865f2,
             timestamp: new Date().toISOString(),
           },

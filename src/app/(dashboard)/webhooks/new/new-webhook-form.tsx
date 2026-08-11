@@ -5,11 +5,26 @@ import { useRouter } from "next/navigation";
 import { createWebhook } from "../actions";
 import { ChannelSelector } from "@/components/channel-selector";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SOURCE_PRESETS, getSourcePreset } from "@/lib/webhook-extract/presets";
+import { ArrowLeft, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
 import { type ChannelSelection, validateFilter } from "@/lib/filter/schema";
@@ -33,6 +48,8 @@ export default function NewWebhookForm({
   const [priorityTemplate, setPriorityTemplate] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Set once the webhook is created; holds the one-time plaintext key to reveal.
+  const [created, setCreated] = useState<{ id: string; apiKey: string | null } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +64,7 @@ export default function NewWebhookForm({
 
     setSaving(true);
     try {
-      await createWebhook({
+      const { id, apiKey } = await createWebhook({
         name,
         description: description || undefined,
         requireAuth,
@@ -61,12 +78,78 @@ export default function NewWebhookForm({
         priorityTemplate: priorityTemplate || null,
       });
       toast.success("Webhook created");
-      router.push("/webhooks");
+      // The plaintext key is returned once and never stored — reveal it here
+      // before moving on. If auth is off, there is no key to show.
+      setCreated({ id, apiKey: requireAuth ? apiKey : null });
     } catch (err) {
       showError(err, "Failed to create webhook");
     } finally {
       setSaving(false);
     }
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  }
+
+  function applyPreset(id: string) {
+    const preset = getSourcePreset(id);
+    if (!preset) return;
+    setTitleTemplate(preset.titleTemplate);
+    setMessageTemplate(preset.messageTemplate);
+    setTagsTemplate(preset.tagsTemplate);
+    setPriorityTemplate(preset.priorityTemplate);
+    setAdvancedOpen(true);
+    toast.success(`Applied ${preset.label} preset`);
+  }
+
+  if (created) {
+    return (
+      <div className="max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>Webhook created</CardTitle>
+            <CardDescription>
+              {created.apiKey
+                ? "Copy your API key now — it is shown only once and cannot be retrieved later."
+                : "Your webhook is ready. The endpoint URL is the secret; keep it private."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {created.apiKey && (
+              <div className="space-y-2">
+                <Label>API Key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={created.apiKey}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => copyToClipboard(created.apiKey!)}
+                    title="Copy"
+                  >
+                    <Copy data-icon />
+                  </Button>
+                </div>
+                <p className="text-sm text-warning">
+                  Store it somewhere safe now. You can regenerate it later, but
+                  you cannot view this key again.
+                </p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button onClick={() => router.push(`/webhooks/${created.id}`)}>
+                Go to webhook
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -150,6 +233,30 @@ export default function NewWebhookForm({
                 syntax — e.g. <code>{"{issue.title}"}</code>. Leave empty to use
                 automatic detection.
               </p>
+              <div className="space-y-2">
+                <Label>Source preset (optional)</Label>
+                <Select
+                  onValueChange={(v) => {
+                    if (typeof v === "string") applyPreset(v);
+                  }}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="w-full max-w-xs">
+                    <SelectValue placeholder="Fill templates from a known source…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_PRESETS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Pre-fills the template fields below for a common webhook
+                  source. You can edit them afterwards.
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="title-tpl">Title template</Label>
                 <Input

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { hashApiKey } from "@/lib/api-key";
 import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { logger as rootLogger } from "@/lib/logger";
@@ -42,11 +43,11 @@ export async function POST(
       );
     }
     const apiKey = authHeader.slice(7);
-    const expected = webhook.apiKey;
-    if (
-      apiKey.length !== expected.length ||
-      !timingSafeEqual(Buffer.from(apiKey), Buffer.from(expected))
-    ) {
+    // Compare SHA-256 digests: both are fixed 32-byte buffers, so no length
+    // pre-check is needed (and timingSafeEqual would throw on a size mismatch).
+    const presented = Buffer.from(hashApiKey(apiKey), "hex");
+    const expected = Buffer.from(webhook.apiKeyHash, "hex");
+    if (!timingSafeEqual(presented, expected)) {
       logger.warn({ webhookId: webhook.id }, "Auth failed: invalid API key");
       return NextResponse.json(
         { error: "Invalid API key" },
@@ -123,6 +124,10 @@ export async function POST(
   let priority: number | null;
   let tags: string[];
   let payload: Record<string, unknown> | null;
+  // Reuse the raw request text for the jsonb insert instead of re-serializing
+  // the parsed object. Only safe when payload is exactly JSON.parse(rawBody)
+  // (a plain object) — set alongside payload in the JSON branch only.
+  let payloadJson: string | undefined;
 
   if (contentType.includes("application/json")) {
     let body: Record<string, unknown>;
@@ -171,6 +176,7 @@ export async function POST(
     priority = extracted.priority;
     tags = extracted.tags;
     payload = body;
+    payloadJson = rawBody;
   } else {
     const extracted = extractFromText(rawBody, req.headers);
     title = extracted.title;
@@ -196,6 +202,7 @@ export async function POST(
     priority,
     tags,
     payload,
+    payloadJson,
     channelIds: enabledChannels.map((wc) => wc.channelId),
     trace: [...verifiedTrace, webhook.publicId],
   });

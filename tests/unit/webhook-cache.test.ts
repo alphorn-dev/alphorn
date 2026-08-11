@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   subscriptionUpsert: vi.fn(),
+  pgOn: vi.fn(),
   pgConnect: vi.fn(),
   pgQuery: vi.fn(),
   pgEnd: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("pg", () => {
   class Client {
-    on = vi.fn();
+    on = mocks.pgOn;
     connect = mocks.pgConnect;
     query = mocks.pgQuery;
     end = mocks.pgEnd;
@@ -39,7 +40,7 @@ function buildRow(overrides: Record<string, unknown> = {}) {
     id: "wh_1",
     organizationId: "org_1",
     publicId: "pub_1",
-    apiKey: "key",
+    apiKeyHash: "hash",
     requireAuth: false,
     enabled: true,
     deletedAt: null,
@@ -70,11 +71,20 @@ function buildRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// The LISTEN client registers its handlers synchronously on first cache
+// access, so this can be read as soon as a getCachedWebhook call has started.
+function getNotificationHandler(): (msg: { channel: string; payload?: string }) => void {
+  const call = mocks.pgOn.mock.calls.find(([event]) => event === "notification");
+  if (!call) throw new Error("notification handler not registered");
+  return call[1];
+}
+
 describe("webhook-cache", () => {
   beforeEach(async () => {
     vi.resetModules();
     mocks.findUnique.mockReset();
     mocks.subscriptionUpsert.mockReset();
+    mocks.pgOn.mockReset();
     mocks.pgConnect.mockReset().mockResolvedValue(undefined);
     mocks.pgQuery.mockReset().mockResolvedValue(undefined);
     mocks.pgEnd.mockReset().mockResolvedValue(undefined);
@@ -155,6 +165,68 @@ describe("webhook-cache", () => {
     expect(first?.enabled).toBe(true);
     expect(second?.enabled).toBe(false);
     expect(mocks.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache a row when its invalidation arrives during the fetch", async () => {
+    let resolveFetch!: (row: unknown) => void;
+    mocks.findUnique
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFetch = resolve; }))
+      .mockResolvedValueOnce(buildRow({ enabled: false }));
+    const { getCachedWebhook } = await import("@/lib/webhook-cache");
+
+    const inFlight = getCachedWebhook("pub_1");
+    // Invalidation for pub_1 lands while the DB read is still pending.
+    getNotificationHandler()({
+      channel: "alphorn_cache_invalidate",
+      payload: "Webhook:pub_1",
+    });
+    resolveFetch(buildRow({ enabled: true }));
+    const first = await inFlight;
+
+    expect(first?.enabled).toBe(true);
+    // The possibly-stale row must not have been cached: next read hits the DB.
+    const second = await getCachedWebhook("pub_1");
+    expect(second?.enabled).toBe(false);
+    expect(mocks.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache a row when a full flush happens during the fetch", async () => {
+    let resolveFetch!: (row: unknown) => void;
+    mocks.findUnique
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFetch = resolve; }))
+      .mockResolvedValueOnce(buildRow({ enabled: false }));
+    const { getCachedWebhook, flushWebhookCache } = await import(
+      "@/lib/webhook-cache"
+    );
+
+    const inFlight = getCachedWebhook("pub_1");
+    flushWebhookCache();
+    resolveFetch(buildRow({ enabled: true }));
+    await inFlight;
+
+    const second = await getCachedWebhook("pub_1");
+    expect(second?.enabled).toBe(false);
+    expect(mocks.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it("still caches when a concurrent invalidation targets a different publicId", async () => {
+    let resolveFetch!: (row: unknown) => void;
+    mocks.findUnique.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveFetch = resolve; }),
+    );
+    const { getCachedWebhook } = await import("@/lib/webhook-cache");
+
+    const inFlight = getCachedWebhook("pub_1");
+    getNotificationHandler()({
+      channel: "alphorn_cache_invalidate",
+      payload: "Webhook:other",
+    });
+    resolveFetch(buildRow());
+    const first = await inFlight;
+
+    const second = await getCachedWebhook("pub_1");
+    expect(second).toBe(first);
+    expect(mocks.findUnique).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to upsert when the organization has no subscription row yet", async () => {

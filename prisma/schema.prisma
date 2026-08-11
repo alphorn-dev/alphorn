@@ -174,7 +174,11 @@ model Webhook {
   id             String       @id
   name           String
   description    String?
-  apiKey         String       @unique
+  // SHA-256 hex digest of the full API key. The plaintext key is shown to the
+  // user once (on create/regenerate) and never stored. apiKeyPrefix keeps the
+  // leading chars (e.g. "alp_1a2b3c4d") for UI identification.
+  apiKeyHash     String       @unique
+  apiKeyPrefix   String
   publicId       String       @unique
   requireAuth      Boolean      @default(true)
   titleTemplate    String?

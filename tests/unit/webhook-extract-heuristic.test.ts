@@ -53,9 +53,21 @@ describe("extractHeuristic", () => {
     expect(result.message).toBe("");
   });
 
-  it("extracts priority when numeric", () => {
-    const result = extractHeuristic({ message: "hi", priority: 7.4 });
-    expect(result.priority).toBe(7);
+  it("rounds numeric priority", () => {
+    const result = extractHeuristic({ message: "hi", priority: 3.4 });
+    expect(result.priority).toBe(3);
+  });
+
+  it("clamps priority into the 1-5 scale", () => {
+    expect(extractHeuristic({ message: "hi", priority: 7.4 }).priority).toBe(5);
+    expect(extractHeuristic({ message: "hi", priority: 2147483648 }).priority).toBe(5);
+    expect(extractHeuristic({ message: "hi", priority: 0 }).priority).toBe(1);
+    expect(extractHeuristic({ message: "hi", priority: -10 }).priority).toBe(1);
+  });
+
+  it("returns null priority for non-finite numbers", () => {
+    expect(extractHeuristic({ message: "hi", priority: Infinity }).priority).toBeNull();
+    expect(extractHeuristic({ message: "hi", priority: NaN }).priority).toBeNull();
   });
 
   it("returns null priority when absent", () => {

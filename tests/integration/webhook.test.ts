@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { hashApiKey } from "@/lib/api-key";
 
 const mocks = vi.hoisted(() => ({
   getCachedWebhook: vi.fn(),
@@ -61,7 +62,7 @@ type MockWebhook = {
   publicId: string;
   enabled: boolean;
   requireAuth: boolean;
-  apiKey: string;
+  apiKeyHash: string;
   titleTemplate: string | null;
   messageTemplate: string | null;
   tagsTemplate: string | null;
@@ -90,7 +91,7 @@ function buildWebhook(overrides: Partial<MockWebhook> = {}): MockWebhook {
     publicId: "public_1",
     enabled: true,
     requireAuth: false,
-    apiKey: "secret-key",
+    apiKeyHash: hashApiKey("secret-key"),
     titleTemplate: null,
     messageTemplate: null,
     tagsTemplate: null,
@@ -164,7 +165,7 @@ describe("POST /n/:publicId — webhook receiver", () => {
 
   it("rejects invalid API keys using the timing-safe check path", async () => {
     mocks.getCachedWebhook.mockResolvedValue(
-      buildWebhook({ requireAuth: true, apiKey: "abcdefghij" })
+      buildWebhook({ requireAuth: true, apiKeyHash: hashApiKey("the-real-key") })
     );
 
     const { POST } = await import("@/app/n/[publicId]/route");
@@ -172,7 +173,54 @@ describe("POST /n/:publicId — webhook receiver", () => {
       new NextRequest("https://notifex.test/n/protected", {
         method: "POST",
         headers: {
-          authorization: "Bearer zzzzzzzzzz",
+          authorization: "Bearer wrong-key",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ message: "test" }),
+      }),
+      { params: Promise.resolve({ publicId: "protected" }) }
+    );
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ error: "Invalid API key" });
+  });
+
+  it("accepts a valid API key by matching the stored hash", async () => {
+    mocks.persistMessage.mockResolvedValue({ messageId: "msg_auth" });
+    mocks.getCachedWebhook.mockResolvedValue(
+      buildWebhook({ requireAuth: true, apiKeyHash: hashApiKey("the-real-key") })
+    );
+
+    const { POST } = await import("@/app/n/[publicId]/route");
+    const res = await POST(
+      new NextRequest("https://notifex.test/n/protected", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer the-real-key",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ message: "test" }),
+      }),
+      { params: Promise.resolve({ publicId: "protected" }) }
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("rejects a multi-byte key (UTF-8 byte length != char length) without crashing", async () => {
+    // "clé-sécrète" has accented Latin-1 chars: fewer UTF-16 code units than
+    // UTF-8 bytes. Comparing fixed-size hash digests avoids the RangeError the
+    // old string-length pre-check + timingSafeEqual pair would have thrown.
+    mocks.getCachedWebhook.mockResolvedValue(
+      buildWebhook({ requireAuth: true, apiKeyHash: hashApiKey("the-real-key") })
+    );
+
+    const { POST } = await import("@/app/n/[publicId]/route");
+    const res = await POST(
+      new NextRequest("https://notifex.test/n/protected", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer clé-sécrète",
           "content-type": "application/json",
         },
         body: JSON.stringify({ message: "test" }),
@@ -245,18 +293,19 @@ describe("POST /n/:publicId — webhook receiver", () => {
       })
     );
 
+    const bodyObj = {
+      title: "CPU Alert",
+      message: "usage high",
+      priority: 3.6,
+      tags: "infra",
+      extra: { region: "eu-west-1" },
+    };
     const { POST } = await import("@/app/n/[publicId]/route");
     const res = await POST(
       new NextRequest("https://notifex.test/n/public_1", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: "CPU Alert",
-          message: "usage high",
-          priority: 3.6,
-          tags: "infra",
-          extra: { region: "eu-west-1" },
-        }),
+        body: JSON.stringify(bodyObj),
       }),
       { params: Promise.resolve({ publicId: "public_1" }) }
     );
@@ -270,13 +319,9 @@ describe("POST /n/:publicId — webhook receiver", () => {
       message: "usage high",
       priority: 4,
       tags: ["infra"],
-      payload: {
-        title: "CPU Alert",
-        message: "usage high",
-        priority: 3.6,
-        tags: "infra",
-        extra: { region: "eu-west-1" },
-      },
+      payload: bodyObj,
+      // Raw request text is reused verbatim for the jsonb insert (no re-serialize).
+      payloadJson: JSON.stringify(bodyObj),
       channelIds: ["ch_enabled"],
       trace: ["public_1"],
     });
@@ -298,16 +343,17 @@ describe("POST /n/:publicId — webhook receiver", () => {
       })
     );
 
+    const bodyObj = {
+      text: "Slack body",
+      attachments: [{ title: "Slack title" }],
+      tags: ["ops", 123],
+    };
     const { POST } = await import("@/app/n/[publicId]/route");
     const res = await POST(
       new NextRequest("https://notifex.test/n/public_1", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          text: "Slack body",
-          attachments: [{ title: "Slack title" }],
-          tags: ["ops", 123],
-        }),
+        body: JSON.stringify(bodyObj),
       }),
       { params: Promise.resolve({ publicId: "public_1" }) }
     );
@@ -319,11 +365,8 @@ describe("POST /n/:publicId — webhook receiver", () => {
       message: "Slack body",
       priority: null,
       tags: ["ops"],
-      payload: {
-        text: "Slack body",
-        attachments: [{ title: "Slack title" }],
-        tags: ["ops", 123],
-      },
+      payload: bodyObj,
+      payloadJson: JSON.stringify(bodyObj),
       channelIds: [],
       trace: ["public_1"],
     });

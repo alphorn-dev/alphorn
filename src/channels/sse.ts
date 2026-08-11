@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
-import { throwIfNotOk } from "./errors";
+import { PermanentChannelError, throwIfNotOk } from "./errors";
 import { publish } from "@/lib/sse/connection-registry";
 import { formatSseEvent, type SseConfig } from "@/lib/sse/format";
 import { meta } from "./sse.meta";
@@ -24,7 +24,12 @@ registerChannel({
       includePayload: config.includePayload,
     };
 
-    if (process.env.SSE_MODE === "standalone" && process.env.SSE_SERVER_URL) {
+    if (process.env.SSE_MODE === "standalone") {
+      if (!process.env.SSE_SERVER_URL) {
+        throw new PermanentChannelError(
+          "SSE_MODE=standalone requires SSE_SERVER_URL to be set"
+        );
+      }
       // Standalone mode: POST to external SSE server
       const url = `${process.env.SSE_SERVER_URL}/publish/${context.channelId}`;
       const res = await fetchWithTimeout(url, {
@@ -37,6 +42,13 @@ registerChannel({
       });
       await throwIfNotOk(res, "SSE server");
     } else {
+      // A standalone worker has no browser connections — publishing to the
+      // local registry would silently go nowhere while being marked delivered.
+      if (process.env.MODE === "worker") {
+        throw new PermanentChannelError(
+          "SSE channels require the standalone SSE server (SSE_MODE=standalone + SSE_SERVER_URL) when the worker runs separately (MODE=worker)"
+        );
+      }
       // Embedded mode: write directly to connected clients
       const event = formatSseEvent(notification, sseConfig);
       publish(context.channelId, event);

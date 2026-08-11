@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractFromPayload } from "@/lib/webhook-extract";
+import { extractFromPayload, extractFromText } from "@/lib/webhook-extract";
 
 describe("extractFromPayload", () => {
   it("uses the template when set", () => {
@@ -182,7 +182,44 @@ describe("extractFromPayload", () => {
         priorityTemplate: "{missing}",
       },
     });
-    expect(result.priority).toBe(9);
+    expect(result.priority).toBe(5);
     expect(result.tags).toEqual(["alert"]);
+  });
+
+  it("clamps a template priority that resolves out of range", () => {
+    const result = extractFromPayload({
+      body: { level: 2147483648 },
+      headers: {},
+      templates: {
+        titleTemplate: null,
+        messageTemplate: "msg",
+        tagsTemplate: null,
+        priorityTemplate: "{level}",
+      },
+    });
+    expect(result.priority).toBe(5);
+  });
+});
+
+describe("extractFromText", () => {
+  it("passes through an in-range X-Priority header", () => {
+    const result = extractFromText(
+      "body",
+      new Headers({ "x-title": "T", "x-priority": "4", "x-tags": "a,b" })
+    );
+    expect(result.title).toBe("T");
+    expect(result.message).toBe("body");
+    expect(result.priority).toBe(4);
+    expect(result.tags).toEqual(["a", "b"]);
+  });
+
+  it("clamps an out-of-range X-Priority header", () => {
+    const result = extractFromText("body", new Headers({ "x-priority": "2147483648" }));
+    expect(result.priority).toBe(5);
+  });
+
+  it("returns null priority for a non-numeric X-Priority header", () => {
+    const result = extractFromText("body", new Headers({ "x-priority": "urgent" }));
+    expect(result.priority).toBeNull();
   });
 });

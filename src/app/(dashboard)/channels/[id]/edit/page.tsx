@@ -9,13 +9,13 @@ export default async function EditChannelPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [role, channel] = await Promise.all([
-    getMemberRole(),
-    getChannelById(id),
-  ]);
+  // Check role before fetching: getChannelById returns the config (credentials)
+  // and is admin-gated, so a member must be redirected before it is called.
+  const role = await getMemberRole();
   if (!role || !["owner", "admin"].includes(role)) {
     redirect("/channels");
   }
+  const channel = await getChannelById(id);
   if (!channel) {
     notFound();
   }

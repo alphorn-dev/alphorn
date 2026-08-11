@@ -18,6 +18,10 @@ export async function startWorker() {
     expireInSeconds: 300,       // 5 min timeout per active job
     deleteAfterSeconds: 604800, // purge completed jobs after 7 days
     retentionSeconds: 1209600,  // drop unstarted jobs after 14 days
+    notify: true,               // NOTIFY on job create → workers wake immediately
+                                // instead of waiting out the poll. Needs the pg-boss
+                                // instance started with useListenNotify (src/lib/queue.ts);
+                                // harmless (polling continues) until that lands.
   });
 
   const concurrency = Number(process.env.WORKER_CONCURRENCY) || 20;

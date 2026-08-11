@@ -1,6 +1,5 @@
 import {
   requireSession,
-  currentUserHas2FACapability,
   currentUserHasPassword,
 } from "@/lib/auth/server";
 import { ProfileTabs } from "./profile-tabs";
@@ -10,11 +9,12 @@ import { isMailerConfigured } from "@/lib/email/mailer";
 export default async function ProfilePage() {
   const session = await requireSession();
 
-  const [orgsRequiring2FA, can2FA, userHasPassword] = await Promise.all([
+  const [orgsRequiring2FA, userHasPassword] = await Promise.all([
     getOrgs2FARequirements(),
-    currentUserHas2FACapability(),
     currentUserHasPassword(),
   ]);
+  // 2FA self-management requires a password, so the capability equals hasPassword.
+  const can2FA = userHasPassword;
 
   return (
     <div className="max-w-2xl">

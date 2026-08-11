@@ -165,11 +165,10 @@ export async function requireAdminOrOwner() {
 }
 
 /**
- * Whether the current user can self-manage 2FA (enable/disable/regenerate).
- * Not possible for users without a password (SSO-only) because Better Auth's
- * 2FA flow requires password confirmation at every step.
+ * Whether the current session user has a password (credential) account, as
+ * opposed to being SSO-only. Returns false when there is no session.
  */
-export const currentUserHas2FACapability = cache(async (): Promise<boolean> => {
+export const currentUserHasPassword = cache(async (): Promise<boolean> => {
   const session = await getSession();
   if (!session) return false;
   const { prisma } = await import("../db");
@@ -180,7 +179,12 @@ export const currentUserHas2FACapability = cache(async (): Promise<boolean> => {
   return !!credential;
 });
 
-export const currentUserHasPassword = currentUserHas2FACapability;
+/**
+ * Whether the current user can self-manage 2FA (enable/disable/regenerate).
+ * Equivalent to having a password: Better Auth's 2FA flow requires password
+ * confirmation at every step, so SSO-only users cannot self-manage it.
+ */
+export const currentUserHas2FACapability = currentUserHasPassword;
 
 /**
  * Whether the current session user satisfies the "has 2FA" bar used by

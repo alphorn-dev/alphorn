@@ -7,11 +7,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Mail, Percent, CheckCircle2, XCircle, Timer, RotateCw, Layers } from "lucide-react";
-
-function formatLatency(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
+import { formatLatency } from "@/lib/format-date";
 
 export default async function MetricsPage() {
   const metrics = await getMetrics(30);

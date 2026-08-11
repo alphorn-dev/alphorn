@@ -110,4 +110,43 @@ describe("normalizeSlackPayload", () => {
     expect(result.message).toBe("");
     expect(result.title).toBeNull();
   });
+
+  it("ignores null block entries", () => {
+    const result = normalizeSlackPayload({ blocks: [null] });
+    expect(result.message).toBe("");
+    expect(result.title).toBeNull();
+  });
+
+  it("ignores string block entries", () => {
+    const result = normalizeSlackPayload({ blocks: ["section"] });
+    expect(result.message).toBe("");
+  });
+
+  it("extracts from valid blocks mixed with junk entries", () => {
+    const result = normalizeSlackPayload({
+      blocks: [null, "x", 42, { type: "section", text: { text: "Real" } }],
+    });
+    expect(result.message).toBe("Real");
+  });
+
+  it("ignores null attachment entries", () => {
+    const result = normalizeSlackPayload({ attachments: [null] });
+    expect(result.message).toBe("");
+    expect(result.title).toBeNull();
+  });
+
+  it("extracts from valid attachments mixed with junk entries", () => {
+    const result = normalizeSlackPayload({
+      attachments: [null, "x", 42, { fallback: "Fallback", title: "Title" }],
+    });
+    expect(result.message).toBe("Fallback");
+    expect(result.title).toBe("Title");
+  });
+
+  it("skips non-string attachment text fields", () => {
+    const result = normalizeSlackPayload({
+      attachments: [{ fallback: 123, text: "ok" }],
+    });
+    expect(result.message).toBe("ok");
+  });
 });

@@ -34,7 +34,7 @@ async function trySendMail(
   try {
     await sendMail(to, subject, html);
   } catch (err) {
-    logger.error({ component: "mailer", label, to, error: err instanceof Error ? err.message : "Unknown error" }, "Failed to send email");
+    logger.error({ component: "mailer", label, error: err instanceof Error ? err.message : "Unknown error" }, "Failed to send email");
     throw err;
   }
 }
@@ -218,6 +218,3 @@ export const auth = betterAuth({
     })(),
   ],
 });
-
-export type Session = typeof auth.$Infer.Session;
-export type SessionUser = Session["user"];

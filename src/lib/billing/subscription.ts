@@ -88,16 +88,6 @@ export function isWithinQuota(
   return currentUsage < limit;
 }
 
-export async function checkMessageQuota(organizationId: string): Promise<
-  | { allowed: true }
-  | { allowed: false; limit: number; usage: number; plan: string }
-> {
-  if (!isBillingEnabled()) return { allowed: true };
-
-  const sub = await getOrCreateSubscription(organizationId);
-  return checkMessageQuotaForSubscription(organizationId, sub);
-}
-
 type QuotaSubscription = Pick<
   Subscription,
   | "plan"

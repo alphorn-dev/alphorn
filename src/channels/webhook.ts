@@ -2,26 +2,12 @@ import { z } from "zod";
 import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk, PermanentChannelError } from "./errors";
-import { compareHosts } from "@/lib/webhook-loop/same-host";
-import { TRACE_HEADER, signTrace } from "@/lib/webhook-loop/hops";
+import { SAME_HOST_ERROR, isSameHostAsApp, refineNotAppHost } from "./utils";
+import { traceHeaders } from "@/lib/webhook-loop/hops";
 import { meta } from "./webhook.meta";
 
-const SAME_HOST_ERROR =
-  "Webhook channels can't point at this Alphorn instance. Use a channel directly on your webhook instead.";
-
-function getAppUrl(): string {
-  const u = process.env.BETTER_AUTH_URL;
-  if (!u) throw new Error("BETTER_AUTH_URL is required");
-  return u;
-}
-
 const configSchema = z.object({
-  url: z
-    .string()
-    .url("Must be a valid URL")
-    .refine((url) => !compareHosts(url, getAppUrl()), {
-      message: SAME_HOST_ERROR,
-    }),
+  url: refineNotAppHost(z.string().url("Must be a valid URL")),
   method: z.enum(["POST", "PUT"]).default("POST"),
   headers: z.record(z.string(), z.string()).default({}),
 });
@@ -31,7 +17,7 @@ registerChannel({
   configSchema,
   async send(config, notification, context) {
     const { url, method, headers } = config;
-    if (compareHosts(url, getAppUrl())) {
+    if (isSameHostAsApp(url)) {
       throw new PermanentChannelError(SAME_HOST_ERROR);
     }
 
@@ -40,7 +26,7 @@ registerChannel({
     const outHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       ...headers,
-      [TRACE_HEADER]: signTrace(context.trace ?? []),
+      ...traceHeaders(context.trace),
     };
 
     const res = await fetchWithTimeout(url, {
@@ -51,7 +37,9 @@ registerChannel({
         message: notification.message,
         ...(notification.priority != null ? { priority: notification.priority } : {}),
         ...(notification.tags?.length ? { tags: notification.tags } : {}),
-        ...(notification.payload || {}),
+        // Raw payload is nested (not merged top-level) so a raw key named
+        // title/message/priority/tags can't clobber the normalized fields.
+        ...(notification.payload ? { payload: notification.payload } : {}),
         timestamp: new Date().toISOString(),
       }),
     });
@@ -61,7 +49,7 @@ registerChannel({
   // receivers can tell a test ping apart from a real notification.
   async test(config) {
     const { url, method, headers } = config;
-    if (compareHosts(url, getAppUrl())) {
+    if (isSameHostAsApp(url)) {
       throw new PermanentChannelError(SAME_HOST_ERROR);
     }
     const res = await fetchWithTimeout(url, {

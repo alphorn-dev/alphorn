@@ -86,3 +86,45 @@ describe("webhook channel send — outbound headers", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("webhook channel send — body shape", () => {
+  beforeEach(() => {
+    process.env.BETTER_AUTH_URL = "https://app.alphorn.dev";
+    process.env.BETTER_AUTH_SECRET = "test-secret";
+    vi.resetModules();
+  });
+
+  it("normalized fields win; raw payload is nested under `payload` and cannot clobber them", async () => {
+    let sentBody = "";
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      sentBody = init.body as string;
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getChannel } = await import("@/channels");
+    const handler = getChannel("webhook")!;
+
+    await handler.send(
+      { url: "https://example.com/hook", method: "POST", headers: {} },
+      {
+        title: "Real Title",
+        message: "Real message",
+        priority: 3,
+        tags: ["a"],
+        payload: { title: 999, message: "raw", priority: "high", extra: "keep" },
+      },
+      { channelId: "c", deliveryId: "d" },
+    );
+
+    const body = JSON.parse(sentBody);
+    expect(body.title).toBe("Real Title");
+    expect(body.message).toBe("Real message");
+    expect(body.priority).toBe(3);
+    expect(body.tags).toEqual(["a"]);
+    expect(body.payload).toEqual({ title: 999, message: "raw", priority: "high", extra: "keep" });
+    expect(typeof body.timestamp).toBe("string");
+
+    vi.unstubAllGlobals();
+  });
+});

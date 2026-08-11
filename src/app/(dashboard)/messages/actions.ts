@@ -79,10 +79,22 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
   const [messages, total] = await Promise.all([
     prisma.message.findMany({
       where,
-      include: {
+      // Only the columns the messages table renders — omit the payload JSONB
+      // (up to the 1MB webhook body limit) and other unused Delivery fields.
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        priority: true,
+        tags: true,
+        createdAt: true,
         webhook: { select: { name: true } },
         deliveries: {
-          include: { channel: { select: { id: true, name: true, type: true } } },
+          select: {
+            id: true,
+            status: true,
+            channel: { select: { id: true, name: true, type: true } },
+          },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -95,16 +107,23 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
   return { messages, total, page, pageSize: PAGE_SIZE };
 }
 
+// The tag filter only needs recently-seen tags, so bound the DISTINCT unnest to
+// this window instead of scanning the org's entire Message history (no index
+// helps this aggregate; the time bound is what keeps it cheap).
+const TAG_WINDOW_DAYS = 30;
+
 export async function getAllTagsForOrg(): Promise<string[]> {
   const session = await requireSession();
   const orgId = session.session.activeOrganizationId;
   if (!orgId) return [];
 
+  const since = new Date(Date.now() - TAG_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const rows = await prisma.$queryRaw<{ tag: string }[]>`
     SELECT DISTINCT unnest("Message"."tags") AS tag
     FROM "Message"
     JOIN "Webhook" ON "Message"."webhookId" = "Webhook"."id"
     WHERE "Webhook"."organizationId" = ${orgId}
+      AND "Message"."createdAt" >= ${since}
     ORDER BY tag ASC
   `;
 
@@ -265,10 +284,19 @@ export async function getDashboardStats() {
     `,
     prisma.message.findMany({
       where: { webhook: { organizationId: orgId } },
-      include: {
+      // Recent-messages card only shows title/webhook/status/time — omit the
+      // payload JSONB and unused Delivery fields.
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
         webhook: { select: { name: true } },
         deliveries: {
-          include: { channel: { select: { id: true, name: true, type: true } } },
+          select: {
+            id: true,
+            status: true,
+            channel: { select: { id: true, name: true, type: true } },
+          },
         },
       },
       orderBy: { createdAt: "desc" },

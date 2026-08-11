@@ -20,7 +20,8 @@ async function seedWebhookWithChannels(count: number) {
     data: {
       id: `wh_${nanoid(10)}`,
       name: "Enqueue webhook",
-      apiKey: `key_${nanoid(20)}`,
+      apiKeyHash: `hash_${nanoid(20)}`,
+      apiKeyPrefix: "alp_test",
       publicId: nanoid(12),
       organizationId: orgId,
     },

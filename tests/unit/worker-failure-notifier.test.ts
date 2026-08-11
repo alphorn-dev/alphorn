@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  findDelivery: vi.fn(),
   findSettings: vi.fn(),
   findChannel: vi.fn(),
   getChannel: vi.fn(),
@@ -10,9 +9,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({
   prisma: {
-    delivery: {
-      findUnique: mocks.findDelivery,
-    },
     organizationSettings: {
       findUnique: mocks.findSettings,
     },
@@ -45,7 +41,6 @@ function makeDelivery(overrides: Record<string, unknown> = {}) {
     attempts: 5,
     lastError: "boom",
     channel: {
-      id: "failed_channel",
       name: "Broken Slack",
       type: "slack",
       organizationId: "org_1",
@@ -62,56 +57,44 @@ function makeDelivery(overrides: Record<string, unknown> = {}) {
 
 describe("notifyFailure", () => {
   beforeEach(() => {
-    mocks.findDelivery.mockReset();
     mocks.findSettings.mockReset();
     mocks.findChannel.mockReset();
     mocks.getChannel.mockReset();
   });
 
-  it("returns when the delivery cannot be found", async () => {
-    mocks.findDelivery.mockResolvedValue(null);
-
-    const { notifyFailure } = await import("@/worker/failure-notifier");
-    await expect(notifyFailure("missing")).resolves.toBeUndefined();
-  });
-
   it("returns when no failure notification channel is configured", async () => {
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue(null);
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery());
 
     expect(mocks.findChannel).not.toHaveBeenCalled();
   });
 
   it("avoids infinite loops when the failed channel is the failure channel", async () => {
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "failed_channel",
     });
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery());
 
     expect(mocks.findChannel).not.toHaveBeenCalled();
   });
 
   it("returns when the failure channel is disabled or missing", async () => {
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "notify_channel",
     });
     mocks.findChannel.mockResolvedValue({ id: "notify_channel", enabled: false });
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery());
 
     expect(mocks.getChannel).not.toHaveBeenCalled();
   });
 
   it("returns when there is no handler for the failure channel type", async () => {
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "notify_channel",
     });
@@ -124,7 +107,7 @@ describe("notifyFailure", () => {
     mocks.getChannel.mockReturnValue(undefined);
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery());
 
     expect(mocks.getChannel).toHaveBeenCalledWith("discord");
   });
@@ -132,7 +115,6 @@ describe("notifyFailure", () => {
   it("sends a failure notification with webhook, channel, error, and attempt context", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "notify_channel",
     });
@@ -142,10 +124,10 @@ describe("notifyFailure", () => {
       enabled: true,
       config: { webhookUrl: "https://discord.test" },
     });
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery());
 
     expect(send).toHaveBeenCalledWith(
       { webhookUrl: "https://discord.test" },
@@ -166,10 +148,14 @@ describe("notifyFailure", () => {
     );
   });
 
-  it("swallows errors from the failure channel itself", async () => {
-    const send = vi.fn().mockRejectedValue(new Error("discord down"));
+  it("parses the failure channel config before sending", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    // A schema that injects a default the raw config lacks — send must receive
+    // the parsed value, proving parse runs before send.
+    const configSchema = {
+      parse: (c: Record<string, unknown>) => ({ ...c, priority: 5 }),
+    };
 
-    mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "notify_channel",
     });
@@ -179,16 +165,38 @@ describe("notifyFailure", () => {
       enabled: true,
       config: { webhookUrl: "https://discord.test" },
     });
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema, send });
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await expect(notifyFailure("del_1")).resolves.toBeUndefined();
+    await notifyFailure(makeDelivery());
+
+    expect(send.mock.calls[0][0]).toEqual({
+      webhookUrl: "https://discord.test",
+      priority: 5,
+    });
+  });
+
+  it("swallows errors from the failure channel itself", async () => {
+    const send = vi.fn().mockRejectedValue(new Error("discord down"));
+
+    mocks.findSettings.mockResolvedValue({
+      failureNotificationChannelId: "notify_channel",
+    });
+    mocks.findChannel.mockResolvedValue({
+      id: "notify_channel",
+      type: "discord",
+      enabled: true,
+      config: { webhookUrl: "https://discord.test" },
+    });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
+
+    const { notifyFailure } = await import("@/worker/failure-notifier");
+    await expect(notifyFailure(makeDelivery())).resolves.toBeUndefined();
   });
 
   it("uses 'Unknown' when the failed delivery has no lastError", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
 
-    mocks.findDelivery.mockResolvedValue(makeDelivery({ lastError: null }));
     mocks.findSettings.mockResolvedValue({
       failureNotificationChannelId: "notify_channel",
     });
@@ -198,10 +206,10 @@ describe("notifyFailure", () => {
       enabled: true,
       config: { webhookUrl: "https://discord.test" },
     });
-    mocks.getChannel.mockReturnValue({ send });
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
 
     const { notifyFailure } = await import("@/worker/failure-notifier");
-    await notifyFailure("del_1");
+    await notifyFailure(makeDelivery({ lastError: null }));
 
     expect(send.mock.calls[0][1].message).toContain("Error: Unknown");
   });

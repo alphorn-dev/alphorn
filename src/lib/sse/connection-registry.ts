@@ -12,14 +12,14 @@ function readPositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
-export function getPerChannelLimit(): number {
+function getPerChannelLimit(): number {
   return readPositiveInt(
     process.env.SSE_MAX_CONNECTIONS_PER_CHANNEL,
     DEFAULT_PER_CHANNEL,
   );
 }
 
-export function getPerIpLimit(): number {
+function getPerIpLimit(): number {
   return readPositiveInt(
     process.env.SSE_MAX_CONNECTIONS_PER_IP,
     DEFAULT_PER_IP,

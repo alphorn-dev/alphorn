@@ -3,7 +3,11 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
 import { basicAuthHeader } from "./utils";
+import { truncate } from "./truncate";
 import { meta } from "./twilio-sms.meta";
+
+// Twilio rejects message bodies over 1600 chars.
+const TWILIO_BODY_MAX = 1600;
 
 const configSchema = z.object({
   accountSid: z.string().min(1, "Account SID is required"),
@@ -27,7 +31,7 @@ registerChannel({
         headers: {
           Authorization: basicAuthHeader(accountSid, authToken),
         },
-        body: new URLSearchParams({ To: to, From: from, Body: body }),
+        body: new URLSearchParams({ To: to, From: from, Body: truncate(body, TWILIO_BODY_MAX) }),
       }
     );
     await throwIfNotOk(res, "Twilio");

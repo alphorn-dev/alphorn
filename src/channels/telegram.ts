@@ -3,18 +3,17 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk } from "./errors";
 import { escapeHtml } from "./utils";
+import { truncate } from "./truncate";
 import { meta } from "./telegram.meta";
 
 const TELEGRAM_MAX_LENGTH = 4096;
-const TRUNCATION_SUFFIX = "\n…[truncated]";
 
 function buildText(title: string | null, message: string): string {
   const header = title ? `<b>${escapeHtml(title)}</b>\n` : "";
   const body = escapeHtml(message);
   const full = header + body;
   if (full.length <= TELEGRAM_MAX_LENGTH) return full;
-  const room = TELEGRAM_MAX_LENGTH - header.length - TRUNCATION_SUFFIX.length;
-  return header + body.slice(0, Math.max(0, room)) + TRUNCATION_SUFFIX;
+  return header + truncate(body, TELEGRAM_MAX_LENGTH - header.length);
 }
 
 const configSchema = z.object({

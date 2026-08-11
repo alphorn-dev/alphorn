@@ -3,8 +3,12 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { subjectFallback } from "./subject";
 import { throwIfNotOk } from "./errors";
+import { truncate } from "./truncate";
 import { basicAuthHeader } from "./utils";
 import { meta } from "./mailgun.meta";
+
+// RFC 5322 caps a header line (Subject) at 998 chars. The body has no limit.
+const SUBJECT_MAX = 998;
 
 const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
@@ -32,7 +36,7 @@ registerChannel({
       body: new URLSearchParams({
         from,
         to,
-        subject: subjectFallback(notification.title, notification.message),
+        subject: truncate(subjectFallback(notification.title, notification.message), SUBJECT_MAX),
         text: notification.message,
       }),
     });

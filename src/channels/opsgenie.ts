@@ -3,10 +3,15 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { subjectFallback } from "./subject";
 import { throwIfNotOk } from "./errors";
+import { truncate } from "./truncate";
 import { mapPriorityScale } from "@/lib/filter/schema";
 import { meta } from "./opsgenie.meta";
 
 const OPSGENIE_PRIORITY_SCALE = ["P5", "P4", "P3", "P2", "P1"] as const;
+
+// Opsgenie hard limits: alert message 130 chars, description 15000 chars.
+const OPSGENIE_MESSAGE_MAX = 130;
+const OPSGENIE_DESCRIPTION_MAX = 15000;
 
 const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
@@ -33,8 +38,8 @@ registerChannel({
         Authorization: `GenieKey ${apiKey}`,
       },
       body: JSON.stringify({
-        message: subjectFallback(notification.title, notification.message),
-        description: notification.message,
+        message: truncate(subjectFallback(notification.title, notification.message), OPSGENIE_MESSAGE_MAX),
+        description: truncate(notification.message, OPSGENIE_DESCRIPTION_MAX),
         priority: ogPriority,
         source: "Alphorn",
       }),
