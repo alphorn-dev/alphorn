@@ -1,3 +1,5 @@
+// write() must never throw or reject; an implementation is responsible for
+// calling removeConnection() itself when the underlying stream is dead.
 type SseWriter = {
   write(chunk: string): void;
   close(): void;

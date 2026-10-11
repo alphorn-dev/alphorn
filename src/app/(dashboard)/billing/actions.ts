@@ -7,6 +7,7 @@ import { paddleEnv } from "@/lib/billing/env";
 import {
   getOrCreateSubscription,
   countMessagesInPeriod,
+  usagePeriodStart,
   limitsForSubscription,
 } from "@/lib/billing/subscription";
 import {
@@ -24,9 +25,9 @@ export async function getBillingData() {
   const limits = limitsForSubscription(sub);
 
   const [messageCount, webhookCount, channelCount] = await Promise.all([
-    countMessagesInPeriod(orgId, sub.currentPeriodStart),
+    countMessagesInPeriod(orgId, usagePeriodStart(sub)),
     prisma.webhook.count({ where: { organizationId: orgId, deletedAt: null } }),
-    prisma.channel.count({ where: { organizationId: orgId } }),
+    prisma.channel.count({ where: { organizationId: orgId, deletedAt: null } }),
   ]);
 
   return {

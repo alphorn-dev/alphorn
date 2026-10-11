@@ -8,6 +8,7 @@ import {
   currentUserOrgs2FAGap,
   currentUserSatisfies2FA,
 } from "@/lib/auth/server";
+import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -32,6 +33,7 @@ export async function updateOrgSettings(data: {
       where: {
         id: data.failureNotificationChannelId,
         organizationId: orgId,
+        deletedAt: null,
       },
       select: { id: true },
     });
@@ -106,15 +108,7 @@ export async function deleteProject() {
     throw new Error("Only the owner can delete this project");
   }
 
-  const sub = await prisma.subscription.findUnique({
-    where: { organizationId: orgId },
-    select: { paddleSubscriptionId: true, plan: true, status: true },
-  });
-  if (
-    sub?.paddleSubscriptionId &&
-    sub.plan !== "free" &&
-    sub.status !== "cancelled"
-  ) {
+  if (await hasLiveSubscription([orgId])) {
     throw new Error(
       "Cancel your subscription in Billing before deleting this project.",
     );

@@ -25,7 +25,7 @@ registerChannel({
       ? `${notification.title}: ${notification.message}`
       : notification.message;
     const res = await fetchWithTimeout(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
       {
         method: "POST",
         headers: {

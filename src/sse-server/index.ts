@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import pino from "pino";
 import { prisma } from "../lib/db";
@@ -38,7 +38,7 @@ function verifyAuth(authHeader: string | undefined): boolean {
   return timingSafeEqual(actual, expected);
 }
 
-const server = createServer(async (req, res) => {
+async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url!, `http://localhost:${PORT}`);
 
   // GET /stream/[publicId] — SSE stream for clients
@@ -152,6 +152,16 @@ const server = createServer(async (req, res) => {
 
   res.writeHead(404);
   res.end("Not found");
+}
+
+// An unhandled rejection (DB down, malformed publish payload) would crash the
+// process and drop every connected client, so answer 500 instead.
+const server = createServer((req, res) => {
+  handle(req, res).catch((err) => {
+    logger.error({ err }, "SSE request failed");
+    if (!res.headersSent) res.writeHead(500);
+    res.end();
+  });
 });
 
 server.listen(PORT, () => {

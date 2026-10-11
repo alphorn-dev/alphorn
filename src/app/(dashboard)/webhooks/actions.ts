@@ -37,11 +37,19 @@ function validateFilters(channelFilters?: Record<string, FilterDefinition | null
   }
 }
 
+async function loadLinkEnabledMap(webhookId: string) {
+  const links = await prisma.webhookChannel.findMany({
+    where: { webhookId },
+    select: { channelId: true, enabled: true },
+  });
+  return new Map(links.map((l) => [l.channelId, l.enabled]));
+}
+
 async function assertChannelsBelongToOrg(channelIds: string[], orgId: string) {
   if (channelIds.length === 0) return;
   const unique = Array.from(new Set(channelIds));
   const count = await prisma.channel.count({
-    where: { id: { in: unique }, organizationId: orgId },
+    where: { id: { in: unique }, organizationId: orgId, deletedAt: null },
   });
   if (count !== unique.length) {
     throw new Error("One or more channels do not belong to this project");
@@ -202,6 +210,10 @@ export async function updateWebhook(
     priorityTemplate: data.priorityTemplate ?? null,
   });
 
+  // Recreating the links would reset `enabled` to its default and silently
+  // un-mute channels toggled off via toggleWebhookChannel — carry it over.
+  const enabledByChannel = await loadLinkEnabledMap(id);
+
   await prisma.$transaction([
     prisma.webhookChannel.deleteMany({ where: { webhookId: id } }),
     prisma.webhook.update({
@@ -219,6 +231,7 @@ export async function updateWebhook(
           create: data.channelIds.map((channelId) => ({
             channelId,
             filter: data.channelFilters?.[channelId] ?? undefined,
+            enabled: enabledByChannel.get(channelId) ?? true,
           })),
         },
       },
@@ -297,6 +310,8 @@ export async function updateWebhookChannels(
   validateFilters(data.channelFilters);
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
+  const enabledByChannel = await loadLinkEnabledMap(webhookId);
+
   await prisma.$transaction([
     prisma.webhookChannel.deleteMany({ where: { webhookId } }),
     ...data.channelIds.map((channelId) =>
@@ -305,6 +320,7 @@ export async function updateWebhookChannels(
           webhookId,
           channelId,
           filter: data.channelFilters?.[channelId] ?? undefined,
+          enabled: enabledByChannel.get(channelId) ?? true,
         },
       })
     ),

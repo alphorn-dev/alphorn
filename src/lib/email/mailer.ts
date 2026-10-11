@@ -28,6 +28,14 @@ function getTransporter(): nodemailer.Transporter {
       host,
       port,
       secure: port === 465,
+      // 587 is the submission port: refuse to send credentials if a
+      // man-in-the-middle strips the STARTTLS offer.
+      requireTLS: port === 587,
+      // Fail fast like the SMTP channel: nodemailer's defaults (up to 10 min)
+      // would hang sign-up, password reset and invites.
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
       auth: {
         user,
         pass,

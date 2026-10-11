@@ -212,6 +212,7 @@ model Channel {
   enabled        Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
 
   webhooks   WebhookChannel[]
   deliveries Delivery[]
@@ -244,6 +245,11 @@ model Message {
   deliveries Delivery[]
 
   @@index([webhookId, createdAt])
+  // pg_trgm GIN indexes backing the ILIKE substring search on /messages.
+  // Declared here so `prisma migrate dev` never emits DROP INDEX for them
+  // again (it did in 20260702105257_2fa_fields).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Message_title_trgm_idx")
+  @@index([message(ops: raw("gin_trgm_ops"))], type: Gin, map: "Message_message_trgm_idx")
 }
 
 model Delivery {

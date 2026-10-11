@@ -18,8 +18,14 @@ case "${MODE:-all}" in
     echo "Starting Alphorn (worker only)..."
     exec node worker.mjs
     ;;
-  *)
+  all)
     echo "Starting Alphorn (web + worker)..."
     exec node server.js
+    ;;
+  *)
+    # instrumentation.node.ts only embeds the worker for MODE=all, so a typo
+    # would silently run web-only.
+    echo "Unknown MODE '${MODE}': expected all, web, or worker" >&2
+    exit 1
     ;;
 esac

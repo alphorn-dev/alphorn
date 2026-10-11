@@ -80,5 +80,8 @@ jobs:
       - name: Apply migrations
         run: pnpm db:deploy
 
+      - name: Check schema/migration drift
+        run: ./scripts/check-migration-drift.sh
+
       - name: DB integration tests
         run: npx vitest run --project integration-db

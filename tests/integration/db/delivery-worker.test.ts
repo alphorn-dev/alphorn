@@ -74,7 +74,8 @@ describe("handleDelivery — worker integration", () => {
 
     const row = await getDelivery(deliveryId);
     expect(row.status).toBe("FAILED");
-    expect(row.attempts).toBe(1);
+    // Permanent failures exhaust attempts so the sweep never re-enqueues them.
+    expect(row.attempts).toBe(MAX_RETRIES);
     expect(row.lastError).toBe("invalid webhook URL");
   });
 
@@ -88,8 +89,8 @@ describe("handleDelivery — worker integration", () => {
     const row = await getDelivery(deliveryId);
     expect(row.status).toBe("FAILED");
     expect(row.lastError).toContain("Unknown channel type");
-    // attempt counter still bumps so we can see how many times pg-boss picked it up
-    expect(row.attempts).toBe(1);
+    // Unknown channel type is permanent: attempts are exhausted, not bumped.
+    expect(row.attempts).toBe(MAX_RETRIES);
     expect(testChannelCalls()).toHaveLength(0);
   });
 

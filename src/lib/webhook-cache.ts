@@ -24,7 +24,9 @@ export interface CachedWebhook {
   }>;
   subscription: {
     plan: string;
+    status: string;
     currentPeriodStart: Date | null;
+    currentPeriodEnd: Date | null;
     overrideMessageLimit: number | null;
     overrideWebhookLimit: number | null;
     overrideChannelLimit: number | null;
@@ -45,16 +47,22 @@ interface CacheEntry {
 const CACHE_TTL_MS = 30_000;
 const NEGATIVE_CACHE_TTL_MS = 5_000;
 const MAX_CACHE_ENTRIES = 5_000;
+// Unknown publicIds live in their own, smaller map: anyone can mint them, and
+// sharing the FIFO with real webhooks would let a flood of random ids evict
+// the hot entries.
+const MAX_NEGATIVE_CACHE_ENTRIES = 1_000;
 
 const NOTIFY_CHANNEL = "alphorn_cache_invalidate";
 
 const globalForCache = globalThis as unknown as {
   webhookCache?: Map<string, CacheEntry>;
+  webhookNegativeCache?: Map<string, CacheEntry>;
   webhookCacheListener?: ListenerState;
   webhookCacheGenerations?: GenerationState;
 };
 
 const cache = (globalForCache.webhookCache ??= new Map<string, CacheEntry>());
+const negativeCache = (globalForCache.webhookNegativeCache ??= new Map<string, CacheEntry>());
 
 // Invalidation generations close a lost-update race in getCachedWebhook: a
 // NOTIFY arriving between its DB read and cache.set would delete nothing (the
@@ -93,6 +101,7 @@ function getListenerState(): ListenerState {
 function flushCache(reason: string): void {
   generations.global++;
   generations.byPublicId.clear();
+  negativeCache.clear();
   if (cache.size === 0) return;
   logger.debug(
     { component: "webhook-cache", reason, size: cache.size },
@@ -111,6 +120,7 @@ function invalidatePublicId(publicId: string, reason: string): void {
     publicId,
     (generations.byPublicId.get(publicId) ?? 0) + 1,
   );
+  negativeCache.delete(publicId);
   if (!cache.delete(publicId)) return;
   logger.debug(
     { component: "webhook-cache", reason, publicId },
@@ -202,7 +212,9 @@ async function fetchWebhook(publicId: string): Promise<CachedWebhook | null> {
           subscription: {
             select: {
               plan: true,
+              status: true,
               currentPeriodStart: true,
+              currentPeriodEnd: true,
               overrideMessageLimit: true,
               overrideWebhookLimit: true,
               overrideChannelLimit: true,
@@ -251,7 +263,9 @@ async function ensureSubscription(
     update: {},
     select: {
       plan: true,
+      status: true,
       currentPeriodStart: true,
+      currentPeriodEnd: true,
       overrideMessageLimit: true,
       overrideWebhookLimit: true,
       overrideChannelLimit: true,
@@ -274,13 +288,14 @@ export async function getCachedWebhook(
   }
 
   const now = Date.now();
-  const cached = cache.get(publicId);
+  const cached = cache.get(publicId) ?? negativeCache.get(publicId);
   if (cached) {
     const ttl = cached.value === null ? NEGATIVE_CACHE_TTL_MS : CACHE_TTL_MS;
     if (now - cached.fetchedAt < ttl) {
       return cached.value;
     }
     cache.delete(publicId);
+    negativeCache.delete(publicId);
   }
 
   // Capture generations before the read so an invalidation racing the fetch
@@ -294,12 +309,14 @@ export async function getCachedWebhook(
     generations.global === globalGen &&
     (generations.byPublicId.get(publicId) ?? 0) === publicIdGen
   ) {
-    if (cache.size >= MAX_CACHE_ENTRIES) {
+    const target = value === null ? negativeCache : cache;
+    const max = value === null ? MAX_NEGATIVE_CACHE_ENTRIES : MAX_CACHE_ENTRIES;
+    if (target.size >= max) {
       // Drop the oldest insertion — Map preserves insertion order.
-      const oldest = cache.keys().next().value;
-      if (oldest !== undefined) cache.delete(oldest);
+      const oldest = target.keys().next().value;
+      if (oldest !== undefined) target.delete(oldest);
     }
-    cache.set(publicId, { value, fetchedAt: now });
+    target.set(publicId, { value, fetchedAt: now });
   }
   return value;
 }
@@ -315,6 +332,7 @@ export function flushWebhookCache(): void {
 // from a clean slate.
 export function _resetWebhookCacheForTests(): void {
   cache.clear();
+  negativeCache.clear();
   generations.global = 0;
   generations.byPublicId.clear();
   const state = globalForCache.webhookCacheListener;

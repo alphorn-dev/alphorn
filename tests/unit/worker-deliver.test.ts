@@ -67,6 +67,8 @@ function makeDelivery(overrides: Record<string, unknown> = {}) {
       type: "slack",
       name: "Slack",
       config: { token: "x" },
+      enabled: true,
+      deletedAt: null,
     },
     message: {
       id: "msg_1",
@@ -101,6 +103,25 @@ describe("handleDelivery", () => {
     );
   });
 
+  it("drops the delivery without sending or alerting when the channel was disabled", async () => {
+    const send = vi.fn();
+    mocks.findDelivery.mockResolvedValue(
+      makeDelivery({ channel: { ...makeDelivery().channel, enabled: false } })
+    );
+    mocks.getChannel.mockReturnValue({ configSchema: { parse: (c: unknown) => c }, send });
+    mocks.updateDelivery.mockResolvedValue({});
+
+    const { handleDelivery } = await import("@/worker/deliver");
+    await handleDelivery({ deliveryId: "del_1" });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(mocks.updateDelivery).toHaveBeenCalledWith({
+      where: { id: "del_1" },
+      data: { status: "FAILED", attempts: 5, lastError: "Channel disabled" },
+    });
+    expect(mocks.notifyFailure).not.toHaveBeenCalled();
+  });
+
   it("marks the delivery failed when the channel type is unknown", async () => {
     mocks.findDelivery.mockResolvedValue(makeDelivery());
     mocks.getChannel.mockReturnValue(undefined);
@@ -124,6 +145,7 @@ describe("handleDelivery", () => {
       where: { id: "del_1" },
       data: {
         status: "FAILED",
+        attempts: 5,
         lastError: "Unknown channel type: slack",
       },
     });
@@ -347,6 +369,7 @@ describe("handleDelivery", () => {
       where: { id: "del_1" },
       data: {
         status: "FAILED",
+        attempts: 5,
         lastError: "message too long",
       },
     });
@@ -360,7 +383,7 @@ describe("handleDelivery", () => {
     mocks.findDelivery.mockResolvedValue(
       makeDelivery({
         attempts: 0,
-        channel: { id: "ch_1", type: "slack", name: "Slack", config: {} },
+        channel: { id: "ch_1", type: "slack", name: "Slack", config: {}, enabled: true, deletedAt: null },
       })
     );
     mocks.getChannel.mockReturnValue({ configSchema, send });
@@ -381,6 +404,7 @@ describe("handleDelivery", () => {
       where: { id: "del_1" },
       data: {
         status: "FAILED",
+        attempts: 5,
         lastError: expect.stringContaining("Invalid channel config"),
       },
     });

@@ -98,6 +98,17 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
 
   jobLogger.debug({ channelName: delivery.channel.name }, "Delivery processing");
 
+  // Retries can arrive up to 24h later; a channel disabled or deleted since
+  // then must stop receiving. Terminal, but not a failure worth alerting on.
+  if (!delivery.channel.enabled || delivery.channel.deletedAt) {
+    await prisma.delivery.update({
+      where: { id: delivery.id },
+      data: { status: "FAILED", attempts: MAX_RETRIES, lastError: "Channel disabled" },
+    });
+    jobLogger.info("Channel disabled, delivery dropped");
+    return;
+  }
+
   // Per-channel throttle. Checked after the claim so the channel type is known
   // without an extra hot-path query; when over the cap we release the claim
   // (back to PENDING, undo the attempt increment) and reschedule with a delay,
@@ -135,6 +146,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
       where: { id: delivery.id },
       data: {
         status: "FAILED",
+        attempts: MAX_RETRIES, // terminal: keeps the sweep from re-enqueueing
         lastError: `Unknown channel type: ${delivery.channel.type}`,
       },
     });
@@ -182,15 +194,19 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     const errorMessage =
       err instanceof Error ? err.message : "Unknown error";
 
+    const permanent = isPermanentChannelError(err);
+
+    // A permanent failure is terminal. Exhaust `attempts` so the sweep's
+    // "FAILED with retries left" recovery never re-enqueues it (which would
+    // retry a 4xx/config error five times and alert on each).
     const updated = await prisma.delivery.update({
       where: { id: delivery.id },
       data: {
         status: "FAILED",
         lastError: errorMessage,
+        ...(permanent ? { attempts: MAX_RETRIES } : {}),
       },
     });
-
-    const permanent = isPermanentChannelError(err);
 
     if (permanent) {
       jobLogger.error({ error: errorMessage, err, attempts: updated.attempts }, "Delivery permanently failed (non-retryable)");

@@ -17,7 +17,7 @@ export async function getChannelsForOrg() {
   // SMTP passwords, API keys) and this list is shipped to the browser. The
   // config-bearing read (getChannelById) is admin-gated below.
   return prisma.channel.findMany({
-    where: { organizationId: orgId },
+    where: { organizationId: orgId, deletedAt: null },
     select: {
       id: true,
       name: true,
@@ -34,7 +34,7 @@ export async function getChannelById(id: string) {
   const { orgId } = await requireAdminOrOwner();
 
   return prisma.channel.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, deletedAt: null },
   });
 }
 
@@ -48,7 +48,7 @@ export async function createChannel(data: {
   const limits = await getOrgLimits(orgId);
   if (limits?.channels !== null && limits?.channels !== undefined) {
     const currentCount = await prisma.channel.count({
-      where: { organizationId: orgId },
+      where: { organizationId: orgId, deletedAt: null },
     });
     if (currentCount >= limits.channels) {
       throw new Error(
@@ -60,14 +60,16 @@ export async function createChannel(data: {
   const handler = getChannel(data.type);
   if (!handler) throw new Error(`Unknown channel type: ${data.type}`);
 
-  handler.configSchema.parse(data.config);
+  // Persist the parsed config so Zod defaults/coercions (port numbers, default
+  // server URLs, HTTP method) are stored, not the raw form strings.
+  const config = handler.configSchema.parse(data.config);
 
   const channel = await prisma.channel.create({
     data: {
       id: generateChannelId(),
       name: data.name,
       type: data.type,
-      config: data.config as unknown as Prisma.InputJsonValue,
+      config: config as Prisma.InputJsonValue,
       organizationId: orgId,
       publicId: crypto.randomUUID(),
     },
@@ -88,20 +90,19 @@ export async function updateChannel(
   const { orgId } = await requireAdminOrOwner();
 
   const existing = await prisma.channel.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, deletedAt: null },
   });
   if (!existing) throw new Error("Channel not found");
 
   const handler = getChannel(existing.type);
-  if (handler) {
-    handler.configSchema.parse(data.config);
-  }
+  if (!handler) throw new Error(`Unknown channel type: ${existing.type}`);
+  const config = handler.configSchema.parse(data.config);
 
   const channel = await prisma.channel.update({
     where: { id },
     data: {
       name: data.name,
-      config: data.config as unknown as Prisma.InputJsonValue,
+      config: config as Prisma.InputJsonValue,
       enabled: data.enabled,
     },
   });
@@ -114,12 +115,22 @@ export async function deleteChannel(id: string) {
   const { orgId } = await requireAdminOrOwner();
 
   const existing = await prisma.channel.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, deletedAt: null },
   });
   if (!existing) throw new Error("Channel not found");
 
-  await prisma.channel.delete({ where: { id } });
+  // Soft delete: a hard delete cascades through Delivery and wipes history
+  // (same reasoning as the Webhook soft delete). Drop the webhook links so the
+  // channel disappears from routing and the webhook cache immediately.
+  await prisma.$transaction([
+    prisma.webhookChannel.deleteMany({ where: { channelId: id } }),
+    prisma.channel.update({
+      where: { id },
+      data: { deletedAt: new Date(), enabled: false },
+    }),
+  ]);
   revalidatePath("/channels");
+  revalidatePath("/webhooks");
 }
 
 export async function testChannelConfig(data: {
@@ -140,7 +151,7 @@ export async function testChannel(id: string) {
   const { orgId } = await requireAdminOrOwner();
 
   const channel = await prisma.channel.findFirst({
-    where: { id, organizationId: orgId },
+    where: { id, organizationId: orgId, deletedAt: null },
   });
   if (!channel) throw new Error("Channel not found");
 
@@ -148,7 +159,7 @@ export async function testChannel(id: string) {
   if (!handler) throw new Error(`Unknown channel type: ${channel.type}`);
   if (!handler.test) throw new Error("This channel does not support testing");
 
-  await handler.test(channel.config);
+  await handler.test(handler.configSchema.parse(channel.config));
 }
 
 export async function getSseConnectionCount(channelId: string): Promise<number> {
@@ -157,7 +168,7 @@ export async function getSseConnectionCount(channelId: string): Promise<number> 
   if (!orgId) return 0;
 
   const channel = await prisma.channel.findFirst({
-    where: { id: channelId, organizationId: orgId, type: "sse" },
+    where: { id: channelId, organizationId: orgId, type: "sse", deletedAt: null },
   });
   if (!channel) return 0;
 

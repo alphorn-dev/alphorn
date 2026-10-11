@@ -103,8 +103,10 @@ export function getMessagePackPriceId(): string | null {
   return process.env.PADDLE_PRICE_ID_MESSAGE_PACK ?? null;
 }
 
-export function getPlanFromPriceId(priceId: string): PlanId {
+// null for a price that is not one of our plan prices (e.g. a message pack
+// item, or a price id the env no longer lists).
+export function getPlanFromPriceId(priceId: string): PlanId | null {
   if (priceId === process.env.PADDLE_PRICE_ID_PRO) return "pro";
   if (priceId === process.env.PADDLE_PRICE_ID_BUSINESS) return "business";
-  return "free";
+  return null;
 }

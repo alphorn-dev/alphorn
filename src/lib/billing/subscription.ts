@@ -12,6 +12,8 @@ export function limitsForSubscription(
   sub: Pick<
     Subscription,
     | "plan"
+    | "status"
+    | "currentPeriodEnd"
     | "overrideMessageLimit"
     | "overrideWebhookLimit"
     | "overrideChannelLimit"
@@ -20,7 +22,7 @@ export function limitsForSubscription(
   >,
 ): EffectiveLimits {
   return resolveEffectiveLimits(
-    sub.plan,
+    effectivePlan(sub),
     {
       overrideMessageLimit: sub.overrideMessageLimit,
       overrideWebhookLimit: sub.overrideWebhookLimit,
@@ -29,6 +31,30 @@ export function limitsForSubscription(
     },
     sub.purchasedPacks,
   );
+}
+
+/**
+ * The plan whose limits actually apply. Paddle status webhooks only change
+ * `status`, never `plan`, so entitlements must be gated here: a paused or
+ * (past period end) cancelled subscription falls back to free. A cancelled
+ * subscription keeps its plan until `currentPeriodEnd`. past_due keeps the
+ * plan: Paddle is still retrying the payment, and dropping to free would make
+ * enforcePlanLimits disable resources that nothing re-enables once it succeeds.
+ */
+export function effectivePlan(
+  sub: Pick<Subscription, "plan" | "status" | "currentPeriodEnd">,
+): string {
+  if (sub.status === "active" || sub.status === "trialing" || sub.status === "past_due") {
+    return sub.plan;
+  }
+  if (
+    sub.status === "cancelled" &&
+    sub.currentPeriodEnd &&
+    sub.currentPeriodEnd.getTime() > Date.now()
+  ) {
+    return sub.plan;
+  }
+  return "free";
 }
 
 // Cached per React request so repeated billing lookups share one DB hit.
@@ -55,6 +81,23 @@ export const getOrCreateSubscription = cache(
   },
 );
 
+/**
+ * Whether any of the orgs still has a paid Paddle subscription that bills.
+ * Deleting such an org would leave the customer charged with no way to cancel
+ * from the app.
+ */
+export async function hasLiveSubscription(organizationIds: string[]): Promise<boolean> {
+  const live = await prisma.subscription.count({
+    where: {
+      organizationId: { in: organizationIds },
+      paddleSubscriptionId: { not: null },
+      plan: { not: "free" },
+      status: { not: "cancelled" },
+    },
+  });
+  return live > 0;
+}
+
 // Returns null (all unlimited) when billing is disabled.
 export async function getOrgLimits(
   organizationId: string,
@@ -65,13 +108,26 @@ export async function getOrgLimits(
   return limitsForSubscription(sub);
 }
 
+/**
+ * Start of the window message usage is counted in: the Paddle billing period
+ * while the paid plan applies, otherwise the calendar month. Paddle never
+ * clears currentPeriodStart, so after a subscription lapses counting from it
+ * would leave the free quota exhausted forever.
+ */
+export function usagePeriodStart(
+  sub: Pick<Subscription, "plan" | "status" | "currentPeriodStart" | "currentPeriodEnd">,
+): Date {
+  if (sub.currentPeriodStart && effectivePlan(sub) === sub.plan) {
+    return sub.currentPeriodStart;
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
 export async function countMessagesInPeriod(
   organizationId: string,
-  periodStart: Date | null,
+  since: Date,
 ): Promise<number> {
-  const now = new Date();
-  const since = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
-
   return prisma.message.count({
     where: {
       webhook: { organizationId },
@@ -91,6 +147,8 @@ export function isWithinQuota(
 type QuotaSubscription = Pick<
   Subscription,
   | "plan"
+  | "status"
+  | "currentPeriodEnd"
   | "overrideMessageLimit"
   | "overrideWebhookLimit"
   | "overrideChannelLimit"
@@ -114,7 +172,7 @@ export async function checkMessageQuotaForSubscription(
   const limits = limitsForSubscription(sub);
   if (limits.messages === null) return { allowed: true };
 
-  const usage = await countMessagesInPeriod(organizationId, sub.currentPeriodStart);
+  const usage = await countMessagesInPeriod(organizationId, usagePeriodStart(sub));
 
   if (usage < limits.messages) return { allowed: true };
   return { allowed: false, limit: limits.messages, usage, plan: sub.plan };

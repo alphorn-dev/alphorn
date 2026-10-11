@@ -39,7 +39,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
     where: { id: settings.failureNotificationChannelId },
   });
 
-  if (!failureChannel || !failureChannel.enabled) return;
+  if (!failureChannel || !failureChannel.enabled || failureChannel.deletedAt) return;
 
   const handler = getChannel(failureChannel.type);
   if (!handler) return;

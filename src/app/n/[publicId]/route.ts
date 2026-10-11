@@ -26,7 +26,7 @@ export async function POST(
   const webhook = await getCachedWebhook(publicId);
 
   if (!webhook) {
-    logger.warn("Webhook not found");
+    logger.info("Webhook not found");
     return NextResponse.json(
       { error: "Not found" },
       { status: 404 }
@@ -36,7 +36,7 @@ export async function POST(
   if (webhook.requireAuth) {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      logger.warn({ webhookId: webhook.id }, "Auth failed: missing or invalid authorization header");
+      logger.info({ webhookId: webhook.id }, "Auth failed: missing or invalid authorization header");
       return NextResponse.json(
         { error: "Missing or invalid Authorization header" },
         { status: 401 }
@@ -48,7 +48,7 @@ export async function POST(
     const presented = Buffer.from(hashApiKey(apiKey), "hex");
     const expected = Buffer.from(webhook.apiKeyHash, "hex");
     if (!timingSafeEqual(presented, expected)) {
-      logger.warn({ webhookId: webhook.id }, "Auth failed: invalid API key");
+      logger.info({ webhookId: webhook.id }, "Auth failed: invalid API key");
       return NextResponse.json(
         { error: "Invalid API key" },
         { status: 401 }
@@ -57,7 +57,7 @@ export async function POST(
   }
 
   if (!webhook.enabled) {
-    logger.warn({ webhookId: webhook.id }, "Webhook is disabled");
+    logger.info({ webhookId: webhook.id }, "Webhook is disabled");
     return NextResponse.json(
       { error: "Webhook is disabled" },
       { status: 403 }
@@ -100,13 +100,15 @@ export async function POST(
     );
   }
 
+  // Rejections of caller input below log at info: logger.warn is forwarded to
+  // Sentry, and anyone holding a publicId could otherwise burn the quota.
   const bodyLimit = getWebhookBodyLimit();
   let rawBody: string;
   try {
     rawBody = await readBodyWithLimit(req, bodyLimit);
   } catch (err) {
     if (err instanceof PayloadTooLargeError) {
-      logger.warn(
+      logger.info(
         { webhookId: webhook.id, limit: err.limit },
         "Payload too large",
       );
@@ -117,6 +119,13 @@ export async function POST(
     }
     throw err;
   }
+
+  // Postgres rejects U+0000 in text and jsonb (both the raw byte and the JSON
+  // escape "\\u0000"), which would 500 after the quota was consumed. Strip
+  // both forms up front so every derived value (title, message, payload) is
+  // safe to persist. ponytail: also strips the 6-char text "\\u0000" from an
+  // escaped backslash sequence — practically never legitimate content.
+  rawBody = rawBody.replace(/\u0000|\\u0000/g, "");
 
   const contentType = req.headers.get("content-type") || "";
   let title: string | null;
@@ -129,32 +138,40 @@ export async function POST(
   // (a plain object) — set alongside payload in the JSON branch only.
   let payloadJson: string | undefined;
 
-  if (contentType.includes("application/json")) {
-    let body: Record<string, unknown>;
+  // Any "json" content type (incl. application/*+json) is parsed as JSON, and
+  // so is an undeclared body that looks like an object: `curl -d '{...}'`
+  // sends application/x-www-form-urlencoded. Only a declared JSON body is
+  // rejected when it does not parse; anything else falls back to plain text.
+  const declaredJson = contentType.includes("json");
+  let body: Record<string, unknown> | null = null;
+  if (declaredJson || /^\s*\{/.test(rawBody)) {
+    let parsed: unknown;
     try {
-      const parsed: unknown = rawBody ? JSON.parse(rawBody) : null;
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
-        logger.warn(
-          { webhookId: webhook.id, contentType },
-          "JSON body must be an object",
-        );
+      parsed = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      if (declaredJson) {
+        logger.info({ webhookId: webhook.id, contentType }, "Invalid JSON body");
         return NextResponse.json(
-          { error: "JSON body must be an object" },
-          { status: 400 },
+          { error: "Invalid JSON body" },
+          { status: 400 }
         );
       }
+    }
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       body = parsed as Record<string, unknown>;
-    } catch {
-      logger.warn({ webhookId: webhook.id, contentType }, "Invalid JSON body");
+    } else if (declaredJson) {
+      logger.info(
+        { webhookId: webhook.id, contentType },
+        "JSON body must be an object",
+      );
       return NextResponse.json(
-        { error: "Invalid JSON body" },
-        { status: 400 }
+        { error: "JSON body must be an object" },
+        { status: 400 },
       );
     }
+  }
+
+  if (body) {
 
     const headers: Record<string, string> = {};
     req.headers.forEach((value, key) => {

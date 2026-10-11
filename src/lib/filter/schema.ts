@@ -15,20 +15,20 @@ const TagsCondition = z.object({
 const TitleCondition = z.object({
   field: z.literal("title"),
   operator: z.enum(["equals", "not_equals", "contains", "not_contains", "starts_with", "regex"]),
-  value: z.string(),
+  value: z.string().max(1000),
 });
 
 const MessageCondition = z.object({
   field: z.literal("message"),
   operator: z.enum(["equals", "not_equals", "contains", "not_contains", "starts_with", "regex"]),
-  value: z.string(),
+  value: z.string().max(1000),
 });
 
 const PayloadCondition = z.object({
   field: z.literal("payload"),
   path: z.string().trim().min(1, "Payload condition requires a path"),
   operator: z.enum(["equals", "not_equals", "contains", "not_contains", "starts_with", "regex"]),
-  value: z.string(),
+  value: z.string().max(1000),
 });
 
 export const FilterCondition = z.discriminatedUnion("field", [

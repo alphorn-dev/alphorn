@@ -43,7 +43,7 @@ registerChannel({
       headers["Authorization"] = `Bearer ${accessToken}`;
     }
     const res = await fetchWithTimeout(
-      joinUrl(serverUrl, topic),
+      joinUrl(serverUrl, encodeURIComponent(topic)),
       {
         method: "POST",
         headers,

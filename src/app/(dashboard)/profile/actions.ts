@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireSession } from "@/lib/auth/server";
+import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
 import {
   validateEmailChangeRequest,
@@ -49,6 +50,18 @@ export async function requestEmailChange(
 export async function deleteAccount() {
   const session = await requireSession();
   const userId = session.user.id;
+
+  // Sole-member projects are deleted with the account (below), so the same
+  // guard as deleteProject() applies to them.
+  const soleOwned = await prisma.member.findMany({
+    where: { userId, organization: { members: { every: { userId } } } },
+    select: { organizationId: true },
+  });
+  if (await hasLiveSubscription(soleOwned.map((m) => m.organizationId))) {
+    throw new Error(
+      "Cancel the subscription of your project in Billing before deleting your account.",
+    );
+  }
 
   await prisma.$transaction(async (tx) => {
     const memberships = await tx.member.findMany({

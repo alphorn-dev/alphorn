@@ -327,6 +327,67 @@ describe("POST /n/:publicId — webhook receiver", () => {
     });
   });
 
+  it("strips NUL bytes and \\u0000 escapes so Postgres text/jsonb accept the payload", async () => {
+    mocks.persistMessage.mockResolvedValue({ messageId: "msg_1" });
+    mocks.getCachedWebhook.mockResolvedValue(buildWebhook({}));
+
+    const { POST } = await import("@/app/n/[publicId]/route");
+    const res = await POST(
+      new NextRequest("https://notifex.test/n/public_1", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"title":"a\\u0000b","message":"x\u0000y"}',
+      }),
+      { params: Promise.resolve({ publicId: "public_1" }) }
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.persistMessage.mock.calls[0][0];
+    expect(call.title).toBe("ab");
+    expect(call.message).toBe("xy");
+    expect(call.payloadJson).not.toMatch(/\u0000|\\u0000/);
+  });
+
+  it("parses a JSON object body sent without a JSON content type (curl -d)", async () => {
+    mocks.persistMessage.mockResolvedValue({ messageId: "msg_1" });
+    mocks.getCachedWebhook.mockResolvedValue(buildWebhook({}));
+
+    const { POST } = await import("@/app/n/[publicId]/route");
+    const res = await POST(
+      new NextRequest("https://notifex.test/n/public_1", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: '{"title":"Deploy","message":"done","env":"prod"}',
+      }),
+      { params: Promise.resolve({ publicId: "public_1" }) }
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.persistMessage.mock.calls[0][0];
+    expect(call.title).toBe("Deploy");
+    expect(call.payload).toEqual({ title: "Deploy", message: "done", env: "prod" });
+  });
+
+  it("treats an undeclared body that is not valid JSON as plain text", async () => {
+    mocks.persistMessage.mockResolvedValue({ messageId: "msg_1" });
+    mocks.getCachedWebhook.mockResolvedValue(buildWebhook({}));
+
+    const { POST } = await import("@/app/n/[publicId]/route");
+    const res = await POST(
+      new NextRequest("https://notifex.test/n/public_1", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "{not json} backup finished",
+      }),
+      { params: Promise.resolve({ publicId: "public_1" }) }
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.persistMessage.mock.calls[0][0];
+    expect(call.payload).toBeNull();
+    expect(call.message).toContain("backup finished");
+  });
+
   it("normalizes Slack-compatible JSON payloads and passes no channel ids when nothing matches", async () => {
     mocks.persistMessage.mockResolvedValue({ messageId: "msg_slack" });
 

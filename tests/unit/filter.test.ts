@@ -105,6 +105,11 @@ describe("evaluateCondition — priority", () => {
     expect(evaluateCondition(msg({ priority: null }), c)).toBe(false);
   });
 
+  it("not_equals matches when priority is null", () => {
+    const c: FilterCondition = { field: "priority", operator: "not_equals", value: 3 };
+    expect(evaluateCondition(msg({ priority: null }), c)).toBe(true);
+  });
+
   it("returns false for an unknown priority operator", () => {
     const c = { field: "priority", operator: "bogus", value: 3 } as unknown as FilterCondition;
     expect(evaluateCondition(msg(), c)).toBe(false);
@@ -209,6 +214,13 @@ describe("evaluateCondition — payload", () => {
   it("returns false for non-existent path", () => {
     const c: FilterCondition = { field: "payload", path: "missing.key", operator: "equals", value: "x" };
     expect(evaluateCondition(msg(), c)).toBe(false);
+  });
+
+  it("negations match a non-existent path, like a missing title", () => {
+    const notEq: FilterCondition = { field: "payload", path: "missing.key", operator: "not_equals", value: "x" };
+    const notContains: FilterCondition = { field: "payload", path: "missing.key", operator: "not_contains", value: "x" };
+    expect(evaluateCondition(msg(), notEq)).toBe(true);
+    expect(evaluateCondition(msg({ payload: null }), notContains)).toBe(true);
   });
 
   it("blocks __proto__ traversal", () => {

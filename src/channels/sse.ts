@@ -25,9 +25,9 @@ registerChannel({
     };
 
     if (process.env.SSE_MODE === "standalone") {
-      if (!process.env.SSE_SERVER_URL) {
+      if (!process.env.SSE_SERVER_URL || !process.env.SSE_INTERNAL_SECRET) {
         throw new PermanentChannelError(
-          "SSE_MODE=standalone requires SSE_SERVER_URL to be set"
+          "SSE_MODE=standalone requires SSE_SERVER_URL and SSE_INTERNAL_SECRET to be set"
         );
       }
       // Standalone mode: POST to external SSE server

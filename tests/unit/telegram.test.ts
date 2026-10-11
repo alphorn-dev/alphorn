@@ -39,6 +39,23 @@ describe("telegram channel", () => {
     expect(body.parse_mode).toBe("HTML");
   });
 
+  it("does not cut an HTML entity in half when truncating", async () => {
+    const fetchMock = mockFetch(200);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    // No title: the escaped body is cut at 4095 chars + "…", which lands
+    // inside an "&amp;" for this offset.
+    await handler.send(
+      config,
+      { title: null, message: "x".repeat(4093) + "&".repeat(100) },
+      { channelId: "c", deliveryId: "d" }
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.text.length).toBeLessThanOrEqual(4096);
+    expect(body.text).toMatch(/x…$/);
+  });
+
   it("truncates messages longer than 4096 chars", async () => {
     const fetchMock = mockFetch(200);
     globalThis.fetch = fetchMock as unknown as typeof fetch;

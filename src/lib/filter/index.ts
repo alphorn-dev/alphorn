@@ -53,7 +53,8 @@ function evaluatePriority(
   operator: string,
   value: number | number[]
 ): boolean {
-  if (priority === null) return false;
+  // A missing priority is "not equal" to anything, and fails every other test.
+  if (priority === null) return operator === "not_equals";
   switch (operator) {
     case "equals":
       return priority === value;
@@ -128,7 +129,8 @@ function evaluatePayload(
   operator: string,
   value: string
 ): boolean {
+  // A missing path reads as "", the same way a missing title does, so the
+  // negations (not_equals, not_contains) match and the rest do not.
   const resolved = resolvePath(payload, path);
-  if (resolved === undefined) return false;
-  return evaluateString(String(resolved), operator, value);
+  return evaluateString(resolved === undefined ? "" : String(resolved), operator, value);
 }

@@ -8,12 +8,17 @@ import { meta } from "./telegram.meta";
 
 const TELEGRAM_MAX_LENGTH = 4096;
 
+const TELEGRAM_TITLE_MAX_LENGTH = 256;
+
 function buildText(title: string | null, message: string): string {
-  const header = title ? `<b>${escapeHtml(title)}</b>\n` : "";
+  const header = title
+    ? `<b>${escapeHtml(truncate(title, TELEGRAM_TITLE_MAX_LENGTH))}</b>\n`
+    : "";
   const body = escapeHtml(message);
   const full = header + body;
   if (full.length <= TELEGRAM_MAX_LENGTH) return full;
-  return header + truncate(body, TELEGRAM_MAX_LENGTH - header.length);
+  // Drop an entity the cut split in half: Telegram rejects a dangling "&am".
+  return header + truncate(body, TELEGRAM_MAX_LENGTH - header.length).replace(/&[a-z]*…$/, "…");
 }
 
 const configSchema = z.object({

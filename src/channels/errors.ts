@@ -21,7 +21,9 @@ export async function throwIfNotOk(
   label: string
 ): Promise<void> {
   if (res.ok) return;
-  const body = await res.text();
+  // Capped: the message lands in Delivery.lastError, the UI, Sentry and
+  // failure notifications, and some APIs echo the whole request back.
+  const body = (await res.text()).slice(0, 500);
   const msg = `${label} error ${res.status}: ${body}`;
   if (res.status !== 429 && res.status >= 400 && res.status < 500) {
     throw new PermanentChannelError(msg);

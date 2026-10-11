@@ -29,11 +29,10 @@
     "db:seed": "prisma db seed",
     "build:worker": "esbuild src/worker/standalone.ts --bundle --platform=node --format=esm --outfile=worker.mjs --alias:@=./src --packages=external --banner:js='import{createRequire}from\"module\";const require=createRequire(import.meta.url);'",
     "dev:worker": "npx tsx src/worker/standalone.ts",
-    "retention": "npx tsx scripts/retention.ts",
     "sse-server": "npx tsx src/sse-server/index.ts",
     "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
     "test:integration-db": "vitest run --project integration-db",
     "test:watch": "vitest"
   },

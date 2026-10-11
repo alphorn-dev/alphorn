@@ -9,6 +9,10 @@ import type { Prisma } from "@/generated/prisma/client";
 import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
+import {
+  checkMessageQuotaForSubscription,
+  getOrCreateSubscription,
+} from "@/lib/billing/subscription";
 
 export interface MessageFilters {
   q?: string;
@@ -28,7 +32,8 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
   const orgId = session.session.activeOrganizationId;
   if (!orgId) return { messages: [], total: 0, page: 1, pageSize: PAGE_SIZE };
 
-  const page = Math.max(1, parseInt(filters.page ?? "1", 10) || 1);
+  // Capped so a crafted ?page= cannot force a huge OFFSET scan.
+  const page = Math.min(10_000, Math.max(1, parseInt(filters.page ?? "1", 10) || 1));
 
   const where: Prisma.MessageWhereInput = {
     webhook: { organizationId: orgId },
@@ -214,6 +219,11 @@ export async function sendTestMessage(
   });
   if (!webhook) throw new Error("Webhook not found");
 
+  // A UI test message is a real message: it is stored and delivered, so it
+  // counts against the quota like one received on the webhook.
+  const quota = await checkMessageQuotaForSubscription(orgId, await getOrCreateSubscription(orgId));
+  if (!quota.allowed) throw new Error("Message quota exceeded for this billing period");
+
   const normalizedTags = tags?.filter(Boolean) ?? [];
   const payload = { title, message: messageText, _source: "ui" };
   const filterMessage = {
@@ -223,8 +233,11 @@ export async function sendTestMessage(
     tags: normalizedTags,
     payload,
   };
+  // Same eligibility as the receiver (src/app/n/[publicId]/route.ts),
+  // including the per-webhook mute on the link.
   const enabledChannels = webhook.channels.filter(
     (wc) =>
+      wc.enabled &&
       wc.channel.enabled &&
       evaluateFilter(filterMessage, wc.filter as FilterDefinition | null),
   );

@@ -1,28 +1,7 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from ".";
-
-/**
- * Trust-the-IdP policy: a user satisfies 2FA if they have TOTP enabled,
- * OR if they can sign in via a trusted SSO provider (we assume the IdP
- * enforces MFA upstream). Users who only have a password must enable 2FA.
- */
-const userHasSsoAccount = cache(async (userId: string): Promise<boolean> => {
-  const { prisma } = await import("../db");
-  const account = await prisma.account.findFirst({
-    where: { userId, providerId: { not: "credential" } },
-    select: { id: true },
-  });
-  return !!account;
-});
-
-async function userSatisfies2FA(
-  userId: string,
-  twoFactorEnabled: boolean,
-): Promise<boolean> {
-  if (twoFactorEnabled) return true;
-  return userHasSsoAccount(userId);
-}
+import { userSatisfies2FA } from "./two-factor-policy";
 
 async function resolveActiveOrgId(
   userId: string,

@@ -48,16 +48,26 @@ export async function GET(
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
+  // Idempotent: runs on abort, on a failed write, or both. Only ever called
+  // asynchronously or after `keepalive` below is assigned.
+  const cleanup = () => {
+    clearInterval(keepalive);
+    removeConnection(channel.id, sseWriter);
+    sseWriter.close();
+  };
+
+  // writer.write/close return promises that REJECT (not throw) once the
+  // client is gone. Unhandled, those rejections crash the process; handled,
+  // they are our only signal to evict a connection that vanished without an
+  // abort event (killed socket, LB timeout).
   const sseWriter = {
     write(chunk: string) {
-      writer.write(encoder.encode(chunk));
+      writer.write(encoder.encode(chunk)).catch(cleanup);
     },
     close() {
-      try {
-        writer.close();
-      } catch {
+      writer.close().catch(() => {
         // Already closed
-      }
+      });
     },
   };
 
@@ -71,20 +81,12 @@ export async function GET(
   sseWriter.write(formatSseComment("connected"));
 
   const keepalive = setInterval(() => {
-    try {
-      sseWriter.write(formatSseComment("keepalive"));
-    } catch {
-      clearInterval(keepalive);
-      removeConnection(channel.id, sseWriter);
-      sseWriter.close();
-    }
+    sseWriter.write(formatSseComment("keepalive"));
   }, KEEPALIVE_INTERVAL_MS);
 
-  req.signal.addEventListener("abort", () => {
-    clearInterval(keepalive);
-    removeConnection(channel.id, sseWriter);
-    sseWriter.close();
-  });
+  // A client that disconnected while we awaited the DB never fires "abort".
+  if (req.signal.aborted) cleanup();
+  else req.signal.addEventListener("abort", cleanup, { once: true });
 
   return new Response(readable, {
     headers: {

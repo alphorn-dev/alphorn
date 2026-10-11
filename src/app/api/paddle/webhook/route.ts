@@ -7,6 +7,7 @@ import {
 } from "@paddle/paddle-node-sdk";
 import { Prisma } from "@/generated/prisma/client";
 import { getPaddle } from "@/lib/billing/paddle";
+import { claimPaddleEvent } from "@/lib/billing/paddle-events";
 import { paddleEnv } from "@/lib/billing/env";
 import { getPlanFromPriceId, getMessagePackPriceId } from "@/lib/billing/plans";
 import { limitsForSubscription } from "@/lib/billing/subscription";
@@ -78,22 +79,8 @@ export async function POST(request: Request) {
   try {
     await prisma.$transaction(
       async (tx) => {
-        try {
-          await tx.paddleEvent.create({
-            data: {
-              id: event.eventId,
-              type: event.eventType,
-              processedAt: new Date(),
-            },
-          });
-        } catch (err) {
-          if (
-            err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === "P2002"
-          ) {
-            throw new DuplicateEventError();
-          }
-          throw err;
+        if (!(await claimPaddleEvent(tx, event.eventId, event.eventType))) {
+          throw new DuplicateEventError();
         }
 
         await dispatch(tx, event);
@@ -111,7 +98,7 @@ export async function POST(request: Request) {
     if (err instanceof RejectedEventError) {
       log.warn(
         { eventId: event.eventId, eventType: event.eventType, reason: err.message },
-        "Rejecting event with inconsistent customData — not retrying",
+        "Rejecting event, not retrying",
       );
       await prisma.paddleEvent
         .upsert({
@@ -301,17 +288,18 @@ async function handleSubscriptionUpdate(
     );
   }
 
-  const firstItem = data.items[0];
-  const priceId = firstItem?.price?.id;
-  if (!priceId) {
-    log.warn(
-      { subscriptionId: data.id },
-      "Subscription event has no price ID on first item, ignoring",
+  // Scan every item: the plan price is not necessarily first. Mapping an
+  // unknown price to "free" would make enforcePlanLimits disable the paying
+  // customer's webhooks, so refuse the event instead (it stays replayable
+  // from the Paddle dashboard once the price env is fixed).
+  const plan = data.items
+    .map((item) => (item.price?.id ? getPlanFromPriceId(item.price.id) : null))
+    .find((p) => p !== null);
+  if (!plan) {
+    throw new RejectedEventError(
+      `subscription ${data.id} has no item with a known plan price`,
     );
-    return;
   }
-
-  const plan = getPlanFromPriceId(priceId);
   const periodStart = data.currentBillingPeriod?.startsAt
     ? new Date(data.currentBillingPeriod.startsAt)
     : null;
@@ -453,7 +441,7 @@ async function enforcePlanLimits(tx: Tx, organizationId: string) {
 
   if (limits.channels !== null) {
     const excess = await tx.channel.findMany({
-      where: { organizationId, enabled: true },
+      where: { organizationId, enabled: true, deletedAt: null },
       orderBy: { createdAt: "asc" },
       skip: limits.channels,
       select: { id: true },
@@ -527,6 +515,10 @@ async function handleSubscriptionStatus(
     occurredAt: paddleUpdatedAt ?? new Date(),
     paddleEventId,
   });
+
+  // Status changes can drop entitlements (see effectivePlan), so enforce
+  // resource limits here too, not only on plan changes.
+  await enforcePlanLimits(tx, organizationId);
 
   log.info({ organizationId, subscriptionId: data.id, status }, "Subscription status updated");
 }

@@ -141,12 +141,12 @@ describe("GET /api/stream/:publicId — SSE streaming", () => {
 
   it("removes the connection when keepalive writes fail", async () => {
     const realTransformStream = globalThis.TransformStream;
+    // Real WritableStreamDefaultWriter.write() returns a promise that rejects
+    // (never throws) once the client is gone.
     const write = vi.fn()
-      .mockImplementationOnce(() => undefined)
-      .mockImplementationOnce(() => {
-        throw new Error("socket closed");
-      });
-    const close = vi.fn();
+      .mockImplementationOnce(() => Promise.resolve())
+      .mockImplementationOnce(() => Promise.reject(new Error("socket closed")));
+    const close = vi.fn(() => Promise.resolve());
 
     vi.stubGlobal("TransformStream", class MockTransformStream {
       readable = new ReadableStream();
@@ -170,7 +170,7 @@ describe("GET /api/stream/:publicId — SSE streaming", () => {
     );
 
     const writer = mocks.addConnection.mock.calls.at(-1)![1];
-    vi.advanceTimersByTime(30_000);
+    await vi.advanceTimersByTimeAsync(30_000);
 
     expect(mocks.removeConnection).toHaveBeenCalledWith("channel-456", writer);
     expect(close).toHaveBeenCalled();

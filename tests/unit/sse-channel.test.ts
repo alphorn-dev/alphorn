@@ -37,6 +37,13 @@ describe("sse channel", () => {
     await expect(send()).rejects.toBeInstanceOf(PermanentChannelError);
   });
 
+  it("throws PermanentChannelError when SSE_MODE=standalone without SSE_INTERNAL_SECRET", async () => {
+    vi.stubEnv("SSE_MODE", "standalone");
+    vi.stubEnv("SSE_SERVER_URL", "http://sse:4000");
+    vi.stubEnv("SSE_INTERNAL_SECRET", "");
+    await expect(send()).rejects.toBeInstanceOf(PermanentChannelError);
+  });
+
   it("throws PermanentChannelError in a standalone worker without the SSE server", async () => {
     vi.stubEnv("SSE_MODE", "");
     vi.stubEnv("MODE", "worker");
@@ -46,6 +53,7 @@ describe("sse channel", () => {
   it("POSTs to the SSE server in standalone mode", async () => {
     vi.stubEnv("SSE_MODE", "standalone");
     vi.stubEnv("SSE_SERVER_URL", "http://sse:4000");
+    vi.stubEnv("SSE_INTERNAL_SECRET", "secret");
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 

@@ -28,7 +28,7 @@ registerChannel({
         ? "https://api.eu.mailgun.net"
         : "https://api.mailgun.net";
 
-    const res = await fetchWithTimeout(`${baseUrl}/v3/${domain}/messages`, {
+    const res = await fetchWithTimeout(`${baseUrl}/v3/${encodeURIComponent(domain)}/messages`, {
       method: "POST",
       headers: {
         Authorization: basicAuthHeader("api", apiKey),

@@ -128,3 +128,33 @@ describe("webhook channel send — body shape", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("webhook channel configSchema: headers", () => {
+  beforeEach(() => {
+    process.env.BETTER_AUTH_URL = "https://app.alphorn.dev";
+    process.env.BETTER_AUTH_SECRET = "test-secret";
+    vi.resetModules();
+  });
+
+  it.each([
+    [{ "Bad Name": "v" }],
+    [{ "X-Ok": "line\r\nInjected: 1" }],
+    [{ "X-Ok": "emoji 🙂" }],
+  ])("rejects headers undici would throw on: %j", async (headers) => {
+    const { getChannel } = await import("@/channels");
+    const result = getChannel("webhook")!.configSchema.safeParse({
+      url: "https://example.com/hook",
+      headers,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts ordinary headers", async () => {
+    const { getChannel } = await import("@/channels");
+    const result = getChannel("webhook")!.configSchema.safeParse({
+      url: "https://example.com/hook",
+      headers: { Authorization: "Bearer abc.def", "X-Lang": "Grüße" },
+    });
+    expect(result.success).toBe(true);
+  });
+});

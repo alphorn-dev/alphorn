@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { genericOAuth, microsoftEntraId } from "better-auth/plugins/generic-oauth";
@@ -7,6 +7,8 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../db";
 import { logger } from "../logger";
 import { isMailerConfigured, sendMail } from "../email/mailer";
+import { userSatisfies2FA } from "./two-factor-policy";
+import { truncate } from "@/channels/truncate";
 import {
   verificationEmailTemplate,
   invitationEmailTemplate,
@@ -51,6 +53,53 @@ function assertStrongPassword(email: string, password: string): void {
       message: "Password must not contain your email address.",
     });
   }
+}
+
+// Organization endpoints a user may call for a project whose 2FA requirement
+// they do not meet yet: they act on the user's own memberships, not on the
+// project's data.
+const ORG_PATHS_WITHOUT_2FA = new Set([
+  "/organization/create",
+  "/organization/list",
+  "/organization/check-slug",
+  "/organization/accept-invitation",
+  "/organization/reject-invitation",
+  "/organization/get-invitation",
+  "/organization/list-user-invitations",
+  "/organization/leave",
+]);
+
+/**
+ * Enforces the project's `requireTwoFactor` on Better Auth's organization API,
+ * which clients can call directly and so bypasses the server-action gate in
+ * requireSession().
+ */
+async function assertOrg2FA(ctx: Parameters<typeof getSessionFromCtx>[0]): Promise<void> {
+  const session = await getSessionFromCtx(ctx);
+  if (!session) return; // the endpoint itself rejects unauthenticated calls
+
+  const body = ctx.body as { organizationId?: string | null; organizationSlug?: string } | undefined;
+  const query = ctx.query as { organizationId?: string; organizationSlug?: string } | undefined;
+  let orgId: string | null | undefined = body?.organizationId ?? query?.organizationId;
+  const slug = body?.organizationSlug ?? query?.organizationSlug;
+  if (!orgId && slug) {
+    orgId = (await prisma.organization.findUnique({ where: { slug }, select: { id: true } }))?.id;
+  }
+  // set-active with organizationId: null clears the active project.
+  if (orgId === null && ctx.path === "/organization/set-active") return;
+  orgId ??= session.session.activeOrganizationId;
+  if (!orgId) return;
+
+  const settings = await prisma.organizationSettings.findUnique({
+    where: { organizationId: orgId },
+    select: { requireTwoFactor: true },
+  });
+  if (!settings?.requireTwoFactor) return;
+  if (await userSatisfies2FA(session.user.id, session.user.twoFactorEnabled ?? false)) return;
+
+  throw new APIError("FORBIDDEN", {
+    message: "Two-factor authentication is required for this project",
+  });
 }
 
 const betterAuthLogger = logger.child({ component: "better-auth" });
@@ -162,18 +211,26 @@ export const auth = betterAuth({
         if (!verification) return;
         const user = await ctx.context.internalAdapter.findUserById(verification.value);
         if (user?.email) assertStrongPassword(user.email, newPassword);
+        return;
+      }
+
+      if (ctx.path.startsWith("/organization/") && !ORG_PATHS_WITHOUT_2FA.has(ctx.path)) {
+        await assertOrg2FA(ctx);
       }
     }),
   },
   plugins: [
     organization({
+      // Deletion goes through deleteProject() only, which refuses while a paid
+      // Paddle subscription is still live.
+      disableOrganizationDeletion: true,
       ...(mailerReady && {
         sendInvitationEmail: async ({ id, email, organization: org, inviter }) => {
           const acceptUrl = `${requireBaseUrl()}/accept-invitation/${id}`;
           await trySendMail(
             "invitation",
             email,
-            `You've been invited to ${org.name} — Alphorn`,
+            `You've been invited to ${truncate(org.name, 100)} — Alphorn`,
             invitationEmailTemplate(
               org.name,
               inviter.user.name || inviter.user.email,

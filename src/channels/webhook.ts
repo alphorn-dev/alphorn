@@ -9,7 +9,15 @@ import { meta } from "./webhook.meta";
 const configSchema = z.object({
   url: refineNotAppHost(z.string().url("Must be a valid URL")),
   method: z.enum(["POST", "PUT"]).default("POST"),
-  headers: z.record(z.string(), z.string()).default({}),
+  // undici throws a TypeError on an invalid header name or a value with CR/LF
+  // or chars above 0xFF; validated here so it fails at save time instead of
+  // being retried as a transient send error.
+  headers: z
+    .record(
+      z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, "Invalid header name"),
+      z.string().regex(/^[\t\x20-\x7e\x80-\xff]*$/, "Invalid header value"),
+    )
+    .default({}),
 });
 
 registerChannel({
@@ -54,7 +62,8 @@ registerChannel({
     }
     const res = await fetchWithTimeout(url, {
       method,
-      headers: { ...headers, "Content-Type": "application/json" },
+      // Same order as send(): a custom Content-Type header wins in both.
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({
         title: "Alphorn Test",
         body: "This is a test message from Alphorn. If you receive this, your webhook is configured correctly.",

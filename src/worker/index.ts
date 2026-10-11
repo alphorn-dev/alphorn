@@ -11,7 +11,7 @@ import "@/channels";
 export async function startWorker() {
   const queue = await getQueue();
 
-  await queue.createQueue(DELIVERY_QUEUE, {
+  const options = {
     retryLimit: 5,
     retryDelay: 30,
     retryBackoff: true,
@@ -22,7 +22,11 @@ export async function startWorker() {
                                 // instead of waiting out the poll. Needs the pg-boss
                                 // instance started with useListenNotify (src/lib/queue.ts);
                                 // harmless (polling continues) until that lands.
-  });
+  };
+  // createQueue is a no-op for an existing queue, so changed options would
+  // never reach a deployed database without the updateQueue.
+  await queue.createQueue(DELIVERY_QUEUE, options);
+  await queue.updateQueue(DELIVERY_QUEUE, options);
 
   const concurrency = Number(process.env.WORKER_CONCURRENCY) || 20;
   await queue.work<DeliveryJobData>(
