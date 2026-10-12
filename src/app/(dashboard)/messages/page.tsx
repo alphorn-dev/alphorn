@@ -2,6 +2,7 @@ import { getMessagesForOrg, getAllTagsForOrg, getWebhooksForSend } from "./actio
 import type { MessageFilters } from "./actions";
 import { SendMessageDialog } from "./send-message-dialog";
 import { MessagesTable } from "./messages-table";
+import { getMemberRole } from "@/lib/auth/server";
 
 export default async function MessagesPage({
   searchParams,
@@ -9,11 +10,13 @@ export default async function MessagesPage({
   searchParams: Promise<MessageFilters>;
 }) {
   const params = await searchParams;
-  const [result, allTags, webhooks] = await Promise.all([
+  const [result, allTags, webhooks, role] = await Promise.all([
     getMessagesForOrg(params),
     getAllTagsForOrg(),
     getWebhooksForSend(),
+    getMemberRole(),
   ]);
+  const isAdminOrOwner = role === "owner" || role === "admin";
 
   return (
     <div>
@@ -24,7 +27,7 @@ export default async function MessagesPage({
             View your notification message history.
           </p>
         </div>
-        <SendMessageDialog />
+        {isAdminOrOwner && <SendMessageDialog />}
       </div>
 
       <MessagesTable

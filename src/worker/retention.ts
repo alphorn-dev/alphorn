@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isBillingEnabled } from "@/lib/billing/paddle";
 import { getPlanLimits } from "@/lib/billing/plans";
+import { limitsForSubscription } from "@/lib/billing/subscription";
 import { logger } from "@/lib/logger";
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -22,7 +23,13 @@ export function startRetentionSweep() {
           subscription: {
             select: {
               plan: true,
+              status: true,
+              currentPeriodEnd: true,
+              overrideMessageLimit: true,
+              overrideWebhookLimit: true,
+              overrideChannelLimit: true,
               overrideRetentionDays: true,
+              purchasedPacks: true,
             },
           },
         },
@@ -32,9 +39,10 @@ export function startRetentionSweep() {
       // window gets a single deleteMany, instead of one per org per sweep.
       const orgIdsByRetentionDays = new Map<number, string[]>();
       for (const org of orgs) {
-        const retentionDays =
-          org.subscription?.overrideRetentionDays ??
-          getPlanLimits(org.subscription?.plan ?? "free").retentionDays;
+        // Effective plan: a paused or lapsed subscription retains like free.
+        const retentionDays = org.subscription
+          ? limitsForSubscription(org.subscription).retentionDays
+          : getPlanLimits("free").retentionDays;
         const orgIds = orgIdsByRetentionDays.get(retentionDays);
         if (orgIds) {
           orgIds.push(org.id);

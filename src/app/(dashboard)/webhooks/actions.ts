@@ -200,6 +200,22 @@ export async function updateWebhook(
   });
   if (!existing) throw new Error("Webhook not found");
 
+  // Re-enabling must respect the plan limit enforcePlanLimits applies on
+  // downgrade (counted over enabled rows, unlike creation).
+  if (data.enabled && !existing.enabled) {
+    const limits = await getOrgLimits(orgId);
+    if (limits?.webhooks !== null && limits?.webhooks !== undefined) {
+      const enabledCount = await prisma.webhook.count({
+        where: { organizationId: orgId, enabled: true, deletedAt: null },
+      });
+      if (enabledCount >= limits.webhooks) {
+        throw new Error(
+          `Webhook limit reached (${limits.webhooks} enabled). Upgrade your plan or disable another webhook.`,
+        );
+      }
+    }
+  }
+
   validateFilters(data.channelFilters);
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 

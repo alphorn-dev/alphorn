@@ -9,6 +9,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
+import { MAX_DELIVERY_AGE_MS } from "@/worker/deliver";
 import {
   checkMessageQuotaForSubscription,
   getOrCreateSubscription,
@@ -166,6 +167,11 @@ export async function resendDelivery(deliveryId: string) {
   if (!delivery) throw new Error("Delivery not found");
   if (delivery.status === "PENDING" || delivery.status === "PROCESSING") {
     throw new Error("Delivery is already in progress");
+  }
+  // The worker never sends rows past the retry window, so a resend would sit
+  // PENDING forever.
+  if (delivery.createdAt.getTime() < Date.now() - MAX_DELIVERY_AGE_MS) {
+    throw new Error("Deliveries older than 24 hours can't be resent");
   }
 
   await prisma.delivery.update({

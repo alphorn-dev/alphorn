@@ -30,9 +30,11 @@ interface Delivery {
 export function DeliveriesTable({
   messageId,
   initialDeliveries,
+  isAdminOrOwner,
 }: {
   messageId: string;
   initialDeliveries: Delivery[];
+  isAdminOrOwner: boolean;
 }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [resending, setResending] = useState<Record<string, boolean>>({});
@@ -133,7 +135,7 @@ export function DeliveriesTable({
                   <Loader2 data-icon="inline-start" className="animate-spin" />
                   Processing
                 </Button>
-              ) : (
+              ) : isAdminOrOwner && (
                 <Button
                   size="sm"
                   variant="outline"

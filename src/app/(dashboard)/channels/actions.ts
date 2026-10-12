@@ -94,6 +94,22 @@ export async function updateChannel(
   });
   if (!existing) throw new Error("Channel not found");
 
+  // Re-enabling must respect the plan limit enforcePlanLimits applies on
+  // downgrade (counted over enabled rows, unlike creation).
+  if (data.enabled && !existing.enabled) {
+    const limits = await getOrgLimits(orgId);
+    if (limits?.channels !== null && limits?.channels !== undefined) {
+      const enabledCount = await prisma.channel.count({
+        where: { organizationId: orgId, enabled: true, deletedAt: null },
+      });
+      if (enabledCount >= limits.channels) {
+        throw new Error(
+          `Channel limit reached (${limits.channels} enabled). Upgrade your plan or disable another channel.`,
+        );
+      }
+    }
+  }
+
   const handler = getChannel(existing.type);
   if (!handler) throw new Error(`Unknown channel type: ${existing.type}`);
   const config = handler.configSchema.parse(data.config);

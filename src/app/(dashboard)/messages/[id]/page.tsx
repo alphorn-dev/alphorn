@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { formatDateTime } from "@/lib/format-date";
+import { getMemberRole } from "@/lib/auth/server";
 
 export default async function MessageDetailPage({
   params,
@@ -20,7 +21,7 @@ export default async function MessageDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const message = await getMessageById(id);
+  const [message, role] = await Promise.all([getMessageById(id), getMemberRole()]);
 
   if (!message) {
     notFound();
@@ -92,6 +93,7 @@ export default async function MessageDetailPage({
         <CardContent>
           <DeliveriesTable
             messageId={message.id}
+            isAdminOrOwner={role === "owner" || role === "admin"}
             initialDeliveries={message.deliveries.map((d) => ({
               id: d.id,
               channelId: d.channelId,

@@ -51,6 +51,26 @@ export async function deleteAccount() {
   const session = await requireSession();
   const userId = session.user.id;
 
+  // Deleting the user cascades its Member rows, so a shared project where it
+  // is the only owner would be left ownerless.
+  const soleOwnerOfShared = await prisma.member.findMany({
+    where: {
+      userId,
+      role: "owner",
+      organization: {
+        members: {
+          some: { userId: { not: userId } },
+          none: { userId: { not: userId }, role: "owner" },
+        },
+      },
+    },
+    select: { organization: { select: { name: true } } },
+  });
+  if (soleOwnerOfShared.length > 0) {
+    const names = soleOwnerOfShared.map((m) => m.organization.name).join(", ");
+    throw new Error(`Transfer ownership of ${names} before deleting your account.`);
+  }
+
   // Sole-member projects are deleted with the account (below), so the same
   // guard as deleteProject() applies to them.
   const soleOwned = await prisma.member.findMany({
