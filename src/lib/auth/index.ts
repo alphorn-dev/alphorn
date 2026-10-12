@@ -8,6 +8,7 @@ import { prisma } from "../db";
 import { logger } from "../logger";
 import { isMailerConfigured, sendMail } from "../email/mailer";
 import { userSatisfies2FA } from "./two-factor-policy";
+import { canCreateUser } from "./signup";
 import { truncate } from "@/channels/truncate";
 import {
   verificationEmailTemplate,
@@ -191,6 +192,20 @@ export const auth = betterAuth({
   rateLimit: {
     enabled: true,
     storage: "database",
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Every account-creating path (email sign-up, social, OIDC) lands here.
+        before: async (user) => {
+          if (!(await canCreateUser(user.email))) {
+            throw new APIError("FORBIDDEN", {
+              message: "Sign-ups are disabled. Ask an administrator for an invitation.",
+            });
+          }
+        },
+      },
+    },
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {

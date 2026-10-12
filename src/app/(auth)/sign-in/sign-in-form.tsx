@@ -59,7 +59,13 @@ const providerIcons: Record<string, (props: React.SVGProps<SVGSVGElement>) => Re
   microsoft: MicrosoftIcon,
 };
 
-export function SignInForm({ providers }: { providers: EnabledProvider[] }) {
+export function SignInForm({
+  providers,
+  signupOpen,
+}: {
+  providers: EnabledProvider[];
+  signupOpen: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
@@ -207,12 +213,14 @@ export function SignInForm({ providers }: { providers: EnabledProvider[] }) {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
           </Button>
-          <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href={redirectTo ? `/sign-up?redirect=${encodeURIComponent(redirectTo)}` : "/sign-up"} className="text-primary underline">
-              Sign up
-            </Link>
-          </p>
+          {(signupOpen || redirectTo?.startsWith("/accept-invitation/")) && (
+            <p className="text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link href={redirectTo ? `/sign-up?redirect=${encodeURIComponent(redirectTo)}` : "/sign-up"} className="text-primary underline">
+                Sign up
+              </Link>
+            </p>
+          )}
         </CardFooter>
       </form>
     </Card>

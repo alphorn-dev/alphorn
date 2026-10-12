@@ -14,8 +14,8 @@ export const MAX_RETRIES = 5;
 // channel registry type. Channels not listed are unthrottled. Enforced via the
 // shared Postgres RateLimit table (per channelId) so the cap holds across
 // worker instances. A throttled delivery is rescheduled without consuming a
-// retry — it does not fail. ponytail: fixed per-minute window + global
-// defaults; make per-channel-configurable when users need to tune it.
+// retry, it does not fail. Fixed per-minute window with global defaults;
+// make it per-channel configurable if users need to tune it.
 export const CHANNEL_RATE_LIMITS_PER_MIN: Record<string, number> = {
   slack: 60, // Slack incoming webhooks ~1 msg/s
   telegram: 20, // Telegram ~20 msg/min per group

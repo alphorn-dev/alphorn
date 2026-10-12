@@ -123,8 +123,8 @@ export async function POST(
   // Postgres rejects U+0000 in text and jsonb (both the raw byte and the JSON
   // escape "\\u0000"), which would 500 after the quota was consumed. Strip
   // both forms up front so every derived value (title, message, payload) is
-  // safe to persist. ponytail: also strips the 6-char text "\\u0000" from an
-  // escaped backslash sequence — practically never legitimate content.
+  // safe to persist. This also strips the 6-char text "\\u0000" from an
+  // escaped backslash sequence, which is practically never legitimate content.
   rawBody = rawBody.replace(/\u0000|\\u0000/g, "");
 
   const contentType = req.headers.get("content-type") || "";

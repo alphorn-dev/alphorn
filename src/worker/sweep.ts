@@ -92,10 +92,10 @@ async function reenqueueOrphanedDeliveries() {
   if (orphaned.length === 0) return;
 
   const queue = await getQueue();
-  // Reconstruct the loop-detection trace from this webhook's publicId — the
-  // same trace a fresh direct ingest here would sign. ponytail: upstream
+  // Reconstruct the loop-detection trace from this webhook's publicId (the
+  // same trace a fresh direct ingest here would sign). Upstream
   // cross-instance hops from the original request header are not persisted, so
-  // a re-enqueued orphan starts hop-counting from this webhook only —
+  // a re-enqueued orphan starts hop-counting from this webhook only. That is
   // acceptable for the rare orphan/stuck-recovery path.
   await queue.insert(
     DELIVERY_QUEUE,
@@ -167,9 +167,9 @@ async function recoverStuckProcessing() {
  * rows with retries remaining that have been idle past the live-retry window
  * and are still within the 24h retry window. The idempotent claim in
  * ./deliver.ts makes a double-fire with a still-live retry harmless.
- * ponytail: time-based staleness is a proxy for "job lost" — we do not query
- * pg-boss job state; upgrade to querying the job table if false re-enqueues
- * ever matter.
+ * Time-based staleness is a proxy for "job lost": we do not query pg-boss
+ * job state. Upgrade to querying the job table if false re-enqueues ever
+ * matter.
  */
 async function recoverLostFailedDeliveries() {
   const stuckThreshold = new Date(Date.now() - STUCK_FAILED_AFTER_MS);

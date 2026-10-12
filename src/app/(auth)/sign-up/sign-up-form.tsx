@@ -60,7 +60,13 @@ const providerIcons: Record<string, (props: React.SVGProps<SVGSVGElement>) => Re
   microsoft: MicrosoftIcon,
 };
 
-export function SignUpForm({ providers }: { providers: EnabledProvider[] }) {
+export function SignUpForm({
+  providers,
+  signupOpen,
+}: {
+  providers: EnabledProvider[];
+  signupOpen: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
@@ -123,6 +129,27 @@ export function SignUpForm({ providers }: { providers: EnabledProvider[] }) {
 
   if (verificationSentTo) {
     return <VerificationSentCard email={verificationSentTo} redirectTo={redirectTo} />;
+  }
+
+  // Invite-only: the server still decides per email, this just hides the form
+  // from visitors who arrived without an emailed invitation.
+  if (!signupOpen && !redirectTo?.startsWith("/accept-invitation/")) {
+    return (
+      <Card className="text-center">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Invite only</CardTitle>
+          <CardDescription>
+            Sign-ups are disabled on this instance. Ask an administrator for an
+            invitation.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter className="justify-center">
+          <Link href="/sign-in" className="text-sm text-primary underline">
+            Go to sign in
+          </Link>
+        </CardFooter>
+      </Card>
+    );
   }
 
   return (
