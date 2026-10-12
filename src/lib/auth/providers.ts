@@ -18,7 +18,7 @@ export function getEnabledProviders(): EnabledProvider[] {
     providers.push({ id: "google", name: "Google", type: "social" });
   }
   if (process.env.MICROSOFT_CLIENT_ID) {
-    providers.push({ id: "microsoft-entra-id", name: "Microsoft", type: "oidc" });
+    providers.push({ id: "microsoft", name: "Microsoft", type: "social" });
   }
   if (process.env.OIDC_CLIENT_ID) {
     providers.push({

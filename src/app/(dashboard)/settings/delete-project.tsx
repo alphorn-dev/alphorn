@@ -30,6 +30,7 @@ export function DeleteProjectCard({ projectName }: { projectName: string }) {
       await deleteProject();
       // Hard reload: the active org changed and the settings route no longer
       // resolves for this user, so client-side routing is unreliable here.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/";
     } catch (err) {
       showError(err, "Failed to delete project");

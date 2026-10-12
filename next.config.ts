@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 function resolveAppVersion(): string {
   if (process.env.NEXT_PUBLIC_APP_VERSION) return process.env.NEXT_PUBLIC_APP_VERSION;

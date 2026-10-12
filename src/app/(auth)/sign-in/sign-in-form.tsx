@@ -56,7 +56,7 @@ function MicrosoftIcon(props: React.SVGProps<SVGSVGElement>) {
 const providerIcons: Record<string, (props: React.SVGProps<SVGSVGElement>) => React.ReactNode> = {
   github: GitHubIcon,
   google: GoogleIcon,
-  "microsoft-entra-id": MicrosoftIcon,
+  microsoft: MicrosoftIcon,
 };
 
 export function SignInForm({ providers }: { providers: EnabledProvider[] }) {
@@ -72,17 +72,10 @@ export function SignInForm({ providers }: { providers: EnabledProvider[] }) {
 
   async function handleProviderSignIn(provider: EnabledProvider) {
     setSocialLoading(provider.id);
-    if (provider.type === "oidc") {
-      await authClient.signIn.oauth2({
-        providerId: provider.id,
-        callbackURL: redirectTo || "/",
-      });
-    } else {
-      await authClient.signIn.social({
-        provider: provider.id as "github" | "google",
-        callbackURL: redirectTo || "/",
-      });
-    }
+    await authClient.signIn.social({
+      provider: provider.id,
+      callbackURL: redirectTo || "/",
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {

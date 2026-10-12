@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { genericOAuth, microsoftEntraId } from "better-auth/plugins/generic-oauth";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../db";
 import { logger } from "../logger";
@@ -164,7 +164,7 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["github", "google", "microsoft-entra-id"],
+      trustedProviders: ["github", "google", "microsoft"],
     },
   },
   socialProviders: {
@@ -178,6 +178,13 @@ export const auth = betterAuth({
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      },
+    }),
+    ...(process.env.MICROSOFT_CLIENT_ID && {
+      microsoft: {
+        clientId: process.env.MICROSOFT_CLIENT_ID,
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
+        tenantId: process.env.MICROSOFT_TENANT_ID || "common",
       },
     }),
   },
@@ -243,35 +250,26 @@ export const auth = betterAuth({
     twoFactor({
       issuer: "Alphorn",
     }),
-    ...(() => {
-      const oauthConfigs = [];
-      if (process.env.MICROSOFT_CLIENT_ID) {
-        oauthConfigs.push(
-          microsoftEntraId({
-            clientId: process.env.MICROSOFT_CLIENT_ID,
-            clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-            tenantId: process.env.MICROSOFT_TENANT_ID || "common",
+    ...(process.env.OIDC_CLIENT_ID
+      ? [
+          genericOAuth({
+            config: [
+              {
+                providerId: process.env.OIDC_PROVIDER_ID || "custom-oidc",
+                clientId: process.env.OIDC_CLIENT_ID,
+                clientSecret: process.env.OIDC_CLIENT_SECRET!,
+                discoveryUrl: process.env.OIDC_DISCOVERY_URL,
+                authorizationUrl: process.env.OIDC_AUTHORIZATION_URL,
+                tokenUrl: process.env.OIDC_TOKEN_URL,
+                userInfoUrl: process.env.OIDC_USERINFO_URL,
+                scopes: (process.env.OIDC_SCOPES || "openid profile email")
+                  .split(" ")
+                  .map((s) => s.trim()),
+                pkce: process.env.OIDC_PKCE === "true",
+              },
+            ],
           }),
-        );
-      }
-      if (process.env.OIDC_CLIENT_ID) {
-        oauthConfigs.push({
-          providerId: process.env.OIDC_PROVIDER_ID || "custom-oidc",
-          clientId: process.env.OIDC_CLIENT_ID,
-          clientSecret: process.env.OIDC_CLIENT_SECRET!,
-          discoveryUrl: process.env.OIDC_DISCOVERY_URL,
-          authorizationUrl: process.env.OIDC_AUTHORIZATION_URL,
-          tokenUrl: process.env.OIDC_TOKEN_URL,
-          userInfoUrl: process.env.OIDC_USERINFO_URL,
-          scopes: (process.env.OIDC_SCOPES || "openid profile email")
-            .split(" ")
-            .map((s) => s.trim()),
-          pkce: process.env.OIDC_PKCE === "true",
-        });
-      }
-      return oauthConfigs.length > 0
-        ? [genericOAuth({ config: oauthConfigs })]
-        : [];
-    })(),
+        ]
+      : []),
   ],
 });

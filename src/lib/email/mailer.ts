@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 function getSmtpConfig() {
   return {
@@ -15,9 +15,9 @@ export function isMailerConfigured(): boolean {
   return !!(host && port && user && pass && from);
 }
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
   if (!transporter) {
     if (!isMailerConfigured()) {
       throw new Error("SMTP is not configured");

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession, authClient } from "@/lib/auth/client";
 import { OrgSwitcher } from "./org-switcher";
 import {
@@ -49,6 +49,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
 
   const [memberRole, setMemberRole] = useState<string | null>(null);
@@ -135,13 +136,15 @@ export function AppSidebar() {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-[220px]">
-            <DropdownMenuItem onClick={() => window.location.href = "/profile"}>
+            <DropdownMenuItem onClick={() => router.push("/profile")}>
               <User className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={async () => {
                 await signOut();
+                // Hard reload to drop all client state from the old session.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 window.location.href = "/sign-in";
               }}
             >

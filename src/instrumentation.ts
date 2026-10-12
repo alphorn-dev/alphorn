@@ -12,7 +12,6 @@ export async function register() {
       ),
       environment: process.env.SENTRY_ENVIRONMENT || "production",
       release: APP_VERSION,
-      enableLogs: true,
     });
   }
 

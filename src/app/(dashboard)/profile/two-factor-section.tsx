@@ -143,13 +143,13 @@ export function TwoFactorSection({ orgsRequiring2FACount }: TwoFactorSectionProp
     e.preventDefault();
     setLoading(true);
     try {
-      const { data, error } = await twoFactor.enable({ password });
-      if (error) {
+      const { data, error } = await twoFactor.enable({ password, method: "totp" });
+      if (error || data.method !== "totp") {
         showError(error, "Failed to start 2FA setup");
         return;
       }
-      setTotpURI(data!.totpURI);
-      setBackupCodes(data!.backupCodes);
+      setTotpURI(data.totpURI);
+      setBackupCodes(data.backupCodes);
       setPassword("");
       setStep("verify");
     } finally {
