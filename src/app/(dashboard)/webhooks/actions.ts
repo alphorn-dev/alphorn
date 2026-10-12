@@ -157,7 +157,7 @@ export async function createWebhook(data: {
       apiKeyHash: hashApiKey(apiKey),
       apiKeyPrefix: apiKeyPrefix(apiKey),
       publicId: generatePublicId(),
-      requireAuth: data.requireAuth ?? true,
+      requireAuth: data.requireAuth ?? false,
       organizationId: orgId,
       titleTemplate: templates.titleTemplate ?? null,
       messageTemplate: templates.messageTemplate ?? null,

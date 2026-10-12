@@ -41,7 +41,7 @@ export default function NewWebhookForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedChannels, setSelectedChannels] = useState<ChannelSelection[]>([]);
-  const [requireAuth, setRequireAuth] = useState(true);
+  const [requireAuth, setRequireAuth] = useState(false);
   const [titleTemplate, setTitleTemplate] = useState("");
   const [messageTemplate, setMessageTemplate] = useState("");
   const [tagsTemplate, setTagsTemplate] = useState("");

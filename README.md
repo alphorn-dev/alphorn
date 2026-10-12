@@ -27,7 +27,7 @@ Think of it as a self-hosted alternative to commercial notification hubs, built 
 - **Real-time streaming** — SSE endpoint for live event feeds. Dedicated SSE server for horizontally scaled deployments.
 - **Multi-tenant** — Better Auth with organizations, invitations, roles, and two-factor (TOTP).
 - **Optional billing** — Paddle integration with plan gating if you want to run Alphorn as a service.
-- **Horizontally scalable** — stateless web, standalone workers, shared Postgres + S3-compatible storage. No local state.
+- **Horizontally scalable**: stateless web, standalone workers, all shared state in Postgres. No local state.
 - **Observable** — structured Pino logs and Sentry integration out of the box.
 - **Self-hostable first** — one `docker compose up` away. No cloud lock-in, no mandatory external services.
 
@@ -47,7 +47,7 @@ Open <http://localhost:3000> and create your first account.
 
 ### Local development
 
-Requirements: Node.js 20.9+, pnpm, PostgreSQL 18.
+Requirements: Node.js 22.12+, pnpm, PostgreSQL 18.
 
 ```bash
 pnpm install
@@ -104,7 +104,7 @@ For horizontally scaled SSE, run `pnpm sse-server` with `SSE_MODE=standalone` an
 
 ## Configuration
 
-All configuration is via environment variables. Copy `.env.example` to `.env` — it is the source of truth and documents every option, including optional integrations (OAuth, SMTP, Sentry, S3).
+All configuration is via environment variables. Copy `.env.example` to `.env`: it is the source of truth and documents every option, including optional integrations (OAuth, SMTP, Sentry).
 
 **Minimum required:**
 

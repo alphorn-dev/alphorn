@@ -180,7 +180,7 @@ model Webhook {
   apiKeyHash     String       @unique
   apiKeyPrefix   String
   publicId       String       @unique
-  requireAuth      Boolean      @default(true)
+  requireAuth      Boolean      @default(false)
   titleTemplate    String?
   messageTemplate  String?
   tagsTemplate     String?

@@ -4,7 +4,7 @@ Self-hostable notification router. Receives webhooks, routes messages to 21+ cha
 
 ## Stack
 
-- **Runtime**: Node.js 20.9+ (Next.js 16 requirement, CI uses Node 22). Package manager: **pnpm** only. Do not use npm or yarn, the lockfile is `pnpm-lock.yaml`.
+- **Runtime**: Node.js 22.12+ (pg-boss requirement; CI uses Node 22, the Docker image Node 24). Package manager: **pnpm** only. Do not use npm or yarn, the lockfile is `pnpm-lock.yaml`.
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript 5
 - **UI**: shadcn/ui (base-nova style), Tailwind CSS 4, Lucide icons
 - **Auth**: Better Auth with organization + two-factor plugins. Social/OIDC login providers (GitHub, Google, Microsoft, generic OIDC) are env-driven in `src/lib/auth/providers.ts`.

@@ -1,0 +1,231 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Alphorn API",
+    "version": "1.0.0",
+    "summary": "Send notifications to Alphorn and stream them in real time.",
+    "description": "Alphorn is an open-source notification router. Send a notification to a webhook endpoint and Alphorn delivers it to every channel (Slack, Telegram, email, SMS, push, and more) whose filter matches, with automatic retries. Webhooks, channels, and filters are configured in the Alphorn app. Documentation: https://docs.alphorn.dev",
+    "license": { "name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later" },
+    "contact": { "name": "Alphorn", "url": "https://alphorn.dev" }
+  },
+  "externalDocs": { "description": "Alphorn documentation", "url": "https://docs.alphorn.dev/api-reference/" },
+  "servers": [
+    { "url": "https://app.alphorn.dev", "description": "Hosted Alphorn" },
+    {
+      "url": "{baseUrl}",
+      "description": "Self-hosted Alphorn",
+      "variables": { "baseUrl": { "default": "https://alphorn.example.com", "description": "The instance's BETTER_AUTH_URL" } }
+    }
+  ],
+  "tags": [
+    { "name": "Notifications", "description": "Send notifications to a webhook" },
+    { "name": "Streaming", "description": "Receive notifications over Server-Sent Events" }
+  ],
+  "paths": {
+    "/n/{publicId}": {
+      "post": {
+        "operationId": "sendNotification",
+        "tags": ["Notifications"],
+        "summary": "Send a notification",
+        "description": "Accepts a notification and queues it for delivery to every enabled channel of the webhook whose filter matches. The response returns as soon as the notification is stored; it does not wait for delivery.\n\nThe body can be a JSON object (any fields; `title`, `message`, `priority`, and `tags` are recognized, others are guessed from common field names or mapped with webhook templates), a Slack-compatible payload, or plain text. A body starting with `{` is parsed as JSON even without a JSON `Content-Type`.\n\nChecks run in this order and the first failure decides the response: 404, 401, 403, 508, 429, 413, 400.",
+        "security": [{ "bearerAuth": [] }, {}],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "The webhook's public ID, the last segment of its Endpoint URL.",
+            "schema": { "type": "string", "examples": ["V1StGXR8_Z5jdHi6B-myT"] }
+          },
+          {
+            "name": "X-Title",
+            "in": "header",
+            "required": false,
+            "description": "Plain-text bodies only: notification title.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "X-Priority",
+            "in": "header",
+            "required": false,
+            "description": "Plain-text bodies only: priority from 1 to 5.",
+            "schema": { "type": "string", "examples": ["4"] }
+          },
+          {
+            "name": "X-Tags",
+            "in": "header",
+            "required": false,
+            "description": "Plain-text bodies only: comma-separated tags.",
+            "schema": { "type": "string", "examples": ["deploy,production"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Notification" },
+              "examples": {
+                "agent": {
+                  "summary": "AI agent needs input",
+                  "value": {
+                    "title": "Claude Code - my-app",
+                    "message": "Needs permission to run the database migration",
+                    "priority": 4,
+                    "tags": ["ai-agent", "claude-code", "permission"]
+                  }
+                }
+              }
+            },
+            "text/plain": {
+              "schema": { "type": "string", "description": "The notification message. Use the X-Title, X-Priority, and X-Tags headers for the other fields." },
+              "example": "Backup finished in 42s"
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Notification accepted and queued for delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["messageId"],
+                  "properties": { "messageId": { "type": "string", "description": "ID of the stored message." } }
+                },
+                "example": { "messageId": "0199b2f4-3c1e-7a8d-9f20-5d4c3b2a1e0f" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Disabled" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "429": { "$ref": "#/components/responses/QuotaExceeded" },
+          "508": { "$ref": "#/components/responses/LoopDetected" }
+        }
+      }
+    },
+    "/api/stream/{publicId}": {
+      "get": {
+        "operationId": "streamNotifications",
+        "tags": ["Streaming"],
+        "summary": "Stream notifications (SSE)",
+        "description": "Opens a Server-Sent Events stream for a Live Stream channel. Every notification routed to the channel arrives as an event. The server sends a `: connected` comment right away and a `: keepalive` comment every 30 seconds. No authentication: the channel's stream ID is the secret.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "The Live Stream channel's stream ID.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event stream. With the channel's JSON output format, each `data:` line is a JSON StreamEvent (`x-event-data`); with the text format, a single line of fields separated by ` | `.",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" },
+                "x-event-data": {
+                "type": "object",
+                "required": ["message", "timestamp"],
+                "properties": {
+                  "title": { "type": "string", "description": "Present when the notification has a title." },
+                  "message": { "type": "string" },
+                  "timestamp": { "type": "string", "format": "date-time", "description": "Time the event was streamed." },
+                  "priority": { "type": "number", "description": "Present when switched on in the channel and the notification has one." },
+                  "tags": { "type": "array", "items": { "type": "string" }, "description": "Present when switched on in the channel and the notification has tags." },
+                  "payload": { "type": "object", "additionalProperties": true, "description": "Present when switched on. The JSON request body, or {} for plain-text notifications." }
+                }
+              }
+              }
+            }
+          },
+          "404": { "description": "The stream ID does not exist, the channel is disabled, or it is not a Live Stream channel.", "content": { "text/plain": { "schema": { "type": "string" } } } },
+          "429": { "description": "Too many connections (by default 20 per channel and 20 per client IP).", "content": { "text/plain": { "schema": { "type": "string" } } } },
+          "503": { "description": "Self-hosted only: the instance runs the standalone SSE server but /api/stream/* is not routed to it.", "content": { "text/plain": { "schema": { "type": "string" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The webhook's API key (`alp_` followed by 64 hex characters). Required unless the webhook was created without one."
+      }
+    },
+    "schemas": {
+      "Notification": {
+        "type": "object",
+        "description": "Any JSON object is accepted and stored as the message payload. These fields are recognized directly.",
+        "properties": {
+          "title": { "type": "string", "description": "Short title. Truncated to 200 characters." },
+          "message": { "type": "string", "description": "Notification body. Truncated to 4,000 characters. If no message is found, the whole body is used." },
+          "priority": { "type": "number", "minimum": 1, "maximum": 5, "description": "1 (lowest) to 5 (urgent). Rounded and clamped into 1-5. Must be a JSON number; a string is ignored." },
+          "tags": {
+            "description": "Tags for filtering. A comma-separated string also works.",
+            "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "string" }]
+          },
+          "payload": { "type": "object", "description": "Extra structured data for payload filters and templates.", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    },
+    "responses": {
+      "InvalidBody": {
+        "description": "The Content-Type declares JSON but the body is not valid JSON, or not a JSON object.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Invalid JSON body" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing `Authorization: Bearer` header, or invalid API key.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Invalid API key" } } }
+      },
+      "Disabled": {
+        "description": "The webhook is disabled.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Webhook is disabled" } } }
+      },
+      "NotFound": {
+        "description": "No webhook with this public ID.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Not found" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Body larger than the limit (1 MiB by default, WEBHOOK_MAX_BODY_BYTES when self-hosting).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [{ "$ref": "#/components/schemas/Error" }, { "type": "object", "properties": { "limit": { "type": "integer", "description": "Limit in bytes." } } }]
+            },
+            "example": { "error": "Payload too large", "limit": 1048576 }
+          }
+        }
+      },
+      "QuotaExceeded": {
+        "description": "Monthly message quota exceeded (hosted plans only). Do not retry until the quota resets.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Error" },
+                { "type": "object", "properties": { "limit": { "type": "integer" }, "usage": { "type": "integer" }, "plan": { "type": "string" } } }
+              ]
+            },
+            "example": { "error": "Message quota exceeded", "limit": 3000, "usage": 3000, "plan": "free" }
+          }
+        }
+      },
+      "LoopDetected": {
+        "description": "The request was forwarded through Alphorn webhooks too many times (3 hops by default, WEBHOOK_MAX_HOPS when self-hosting), or came back to a webhook it already passed.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "Loop detected" } } }
+      }
+    }
+  }
+}
