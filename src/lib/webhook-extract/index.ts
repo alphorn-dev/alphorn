@@ -1,7 +1,7 @@
 import { resolveTemplate } from "./template";
 import { clampPriority, extractHeuristic } from "./heuristic";
 import { extractAuto } from "./auto";
-import type { ExtractMode } from "./presets";
+import type { ExtractMode } from "./mode";
 
 interface WebhookTemplates {
   titleTemplate: string | null;

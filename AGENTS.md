@@ -40,7 +40,7 @@ Self-hostable notification router. Receives webhooks, routes messages to 21+ cha
 - `src/app/api/auth/[...all]`: Better Auth catch-all handler.
 - `src/app/n/[publicId]`: public webhook receiver endpoint.
 - `src/lib/filter/`: filter DSL. Zod discriminated unions over conditions (priority, tags, title, message, payload) with regex support via `safe-regex2`.
-- `src/lib/webhook-extract/`: heuristic + template extraction of title/message/priority from arbitrary webhook payloads.
+- `src/lib/webhook-extract/`: extraction of title/message/priority/tags from webhook payloads. Per-webhook `extractMode`: `auto` (known-source formatters in `auto.ts`, the primary path: add new sources there), `template` (user-authored templates), `none` (generic heuristic).
 - `src/lib/webhook-loop/`: loop detection (same-host hop counting) to prevent webhook cycles.
 - `src/lib/webhook-cache.ts`: per-instance cache of webhook configs for the hot receiver path. Kept coherent across instances by Postgres triggers that `NOTIFY alphorn_cache_invalidate` (defined in migration SQL), with a 30s TTL as fallback. Writes to cached tables invalidate automatically; do not add a parallel invalidation mechanism.
 - **Runtime modes**: `MODE=all|web|worker` selects embedded worker vs. standalone. For horizontally scaled SSE, run a dedicated SSE server (`pnpm sse-server`, `src/sse-server/`) with `SSE_MODE=standalone` and `SSE_INTERNAL_SECRET` shared across instances.

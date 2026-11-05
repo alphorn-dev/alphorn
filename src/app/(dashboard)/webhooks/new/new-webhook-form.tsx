@@ -21,7 +21,7 @@ import {
   EMPTY_TEMPLATES,
   type MessageTemplates,
 } from "@/components/message-format-fields";
-import type { ExtractMode } from "@/lib/webhook-extract/presets";
+import type { ExtractMode } from "@/lib/webhook-extract/mode";
 import { ArrowLeft, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";

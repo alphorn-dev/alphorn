@@ -3,21 +3,14 @@
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  SOURCE_PRESETS,
-  getSourcePreset,
-  type ExtractMode,
-} from "@/lib/webhook-extract/presets";
+import { EXTRACT_MODES, type ExtractMode } from "@/lib/webhook-extract/mode";
 
 export interface MessageTemplates {
   titleTemplate: string;
@@ -33,32 +26,17 @@ export const EMPTY_TEMPLATES: MessageTemplates = {
   priorityTemplate: "",
 };
 
-const CUSTOM = "custom";
-
-const MODE_LABELS: Record<string, string> = {
+const MODE_LABELS: Record<ExtractMode, string> = {
   auto: "Auto-detect",
   none: "None (generic)",
-  [CUSTOM]: "Custom template",
+  template: "Custom template",
 };
 
-const MODE_HINTS: Record<string, string> = {
-  auto: "Recognizes GitHub, Sentry, Stripe, Grafana and Alertmanager and formats each event type. Other payloads use the generic detection.",
+const MODE_HINTS: Record<ExtractMode, string> = {
+  auto: "Recognizes common sources (e.g. GitHub, Sentry, Stripe) and formats each event type. Other payloads use the generic detection.",
   none: "Picks title and message from common fields (title, message, body, ...). Falls back to the raw JSON.",
+  template: "Fields resolve {path.to.field} against the payload. Empty fields use the generic detection.",
 };
-
-// The preset id isn't stored, so show a preset as selected while the fields
-// still match it exactly; any edit turns it into "Custom template".
-function selectedValue(mode: ExtractMode, templates: MessageTemplates): string {
-  if (mode !== "template") return mode;
-  const preset = SOURCE_PRESETS.find(
-    (p) =>
-      p.titleTemplate === templates.titleTemplate &&
-      p.messageTemplate === templates.messageTemplate &&
-      p.tagsTemplate === templates.tagsTemplate &&
-      p.priorityTemplate === templates.priorityTemplate
-  );
-  return preset?.id ?? CUSTOM;
-}
 
 export function MessageFormatFields({
   mode,
@@ -71,16 +49,6 @@ export function MessageFormatFields({
   onChange: (mode: ExtractMode, templates: MessageTemplates) => void;
   disabled?: boolean;
 }) {
-  const value = selectedValue(mode, templates);
-  const label = MODE_LABELS[value] ?? getSourcePreset(value)?.label ?? value;
-
-  function handleSelect(v: string | null) {
-    if (v === "auto" || v === "none") return onChange(v, templates);
-    if (v === CUSTOM) return onChange("template", templates);
-    const preset = v ? getSourcePreset(v) : undefined;
-    if (preset) onChange("template", preset);
-  }
-
   function setField(field: keyof MessageTemplates, fieldValue: string) {
     onChange(mode, { ...templates, [field]: fieldValue });
   }
@@ -89,28 +57,26 @@ export function MessageFormatFields({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Message format</Label>
-        <Select value={value} onValueChange={handleSelect} disabled={disabled}>
+        <Select
+          value={mode}
+          onValueChange={(v) => {
+            if (v) onChange(v as ExtractMode, templates);
+          }}
+          disabled={disabled}
+        >
           <SelectTrigger className="w-full max-w-xs">
-            <SelectValue>{label}</SelectValue>
+            <SelectValue>{MODE_LABELS[mode]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="auto">{MODE_LABELS.auto}</SelectItem>
-            <SelectItem value="none">{MODE_LABELS.none}</SelectItem>
-            <SelectSeparator />
-            <SelectGroup>
-              <SelectLabel>Templates</SelectLabel>
-              {SOURCE_PRESETS.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.label}
-                </SelectItem>
-              ))}
-              <SelectItem value={CUSTOM}>{MODE_LABELS[CUSTOM]}</SelectItem>
-            </SelectGroup>
+            {EXTRACT_MODES.map((m) => (
+              <SelectItem key={m} value={m}>
+                {MODE_LABELS[m]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          {MODE_HINTS[mode] ??
-            "Fields resolve {path.to.field} against the payload. Empty fields use the generic detection."}
+          {MODE_HINTS[mode]}
         </p>
       </div>
 

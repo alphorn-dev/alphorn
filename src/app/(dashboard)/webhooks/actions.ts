@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { FilterDefinition as FilterDefinitionSchema } from "@/lib/filter/schema";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { z } from "zod";
-import { EXTRACT_MODES, type ExtractMode } from "@/lib/webhook-extract/presets";
+import { EXTRACT_MODES, type ExtractMode } from "@/lib/webhook-extract/mode";
 
 const templateStringSchema = z
   .string()
@@ -193,7 +193,7 @@ export async function updateWebhook(
     requireAuth: boolean;
     channelIds: string[];
     channelFilters?: Record<string, FilterDefinition | null>;
-    extractMode?: ExtractMode;
+    extractMode: ExtractMode;
     titleTemplate?: string | null;
     messageTemplate?: string | null;
     tagsTemplate?: string | null;
@@ -227,7 +227,7 @@ export async function updateWebhook(
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const templates = webhookTemplatesSchema.parse({
-    extractMode: data.extractMode ?? "auto",
+    extractMode: data.extractMode,
     titleTemplate: data.titleTemplate ?? null,
     messageTemplate: data.messageTemplate ?? null,
     tagsTemplate: data.tagsTemplate ?? null,

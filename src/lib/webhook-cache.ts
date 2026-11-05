@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { prisma } from "./db";
 import { logger } from "./logger";
-import type { ExtractMode } from "./webhook-extract/presets";
+import type { ExtractMode } from "./webhook-extract/mode";
 
 // Shape returned to the webhook route. This is a subset of the full Prisma
 // object with only the fields the receiver hot path needs, plus the related

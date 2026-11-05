@@ -74,7 +74,7 @@ describe("re-enabling respects plan limits", () => {
     const disabled = await createWebhook(false);
 
     await expect(
-      updateWebhook(disabled.id, { name: "w", enabled: true, requireAuth: true, channelIds: [] }),
+      updateWebhook(disabled.id, { name: "w", enabled: true, requireAuth: true, extractMode: "auto", channelIds: [] }),
     ).rejects.toThrow(/Webhook limit reached/);
   });
 });

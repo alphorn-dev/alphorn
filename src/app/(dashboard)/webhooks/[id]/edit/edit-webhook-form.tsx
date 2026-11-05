@@ -15,7 +15,7 @@ import {
   MessageFormatFields,
   type MessageTemplates,
 } from "@/components/message-format-fields";
-import type { ExtractMode } from "@/lib/webhook-extract/presets";
+import type { ExtractMode } from "@/lib/webhook-extract/mode";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
