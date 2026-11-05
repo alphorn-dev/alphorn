@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { FilterDefinition as FilterDefinitionSchema } from "@/lib/filter/schema";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { z } from "zod";
+import { EXTRACT_MODES, type ExtractMode } from "@/lib/webhook-extract/presets";
 
 const templateStringSchema = z
   .string()
@@ -22,6 +23,7 @@ const templateStringSchema = z
   .optional();
 
 const webhookTemplatesSchema = z.object({
+  extractMode: z.enum(EXTRACT_MODES),
   titleTemplate: templateStringSchema,
   messageTemplate: templateStringSchema,
   tagsTemplate: templateStringSchema,
@@ -97,6 +99,7 @@ export async function getWebhookById(id: string) {
       requireAuth: true,
       apiKeyPrefix: true,
       publicId: true,
+      extractMode: true,
       titleTemplate: true,
       messageTemplate: true,
       tagsTemplate: true,
@@ -119,6 +122,7 @@ export async function createWebhook(data: {
   requireAuth?: boolean;
   channelIds: string[];
   channelFilters?: Record<string, FilterDefinition | null>;
+  extractMode?: ExtractMode;
   titleTemplate?: string | null;
   messageTemplate?: string | null;
   tagsTemplate?: string | null;
@@ -142,6 +146,7 @@ export async function createWebhook(data: {
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const templates = webhookTemplatesSchema.parse({
+    extractMode: data.extractMode ?? "auto",
     titleTemplate: data.titleTemplate ?? null,
     messageTemplate: data.messageTemplate ?? null,
     tagsTemplate: data.tagsTemplate ?? null,
@@ -159,6 +164,7 @@ export async function createWebhook(data: {
       publicId: generatePublicId(),
       requireAuth: data.requireAuth ?? false,
       organizationId: orgId,
+      extractMode: templates.extractMode,
       titleTemplate: templates.titleTemplate ?? null,
       messageTemplate: templates.messageTemplate ?? null,
       tagsTemplate: templates.tagsTemplate ?? null,
@@ -187,6 +193,7 @@ export async function updateWebhook(
     requireAuth: boolean;
     channelIds: string[];
     channelFilters?: Record<string, FilterDefinition | null>;
+    extractMode?: ExtractMode;
     titleTemplate?: string | null;
     messageTemplate?: string | null;
     tagsTemplate?: string | null;
@@ -220,6 +227,7 @@ export async function updateWebhook(
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const templates = webhookTemplatesSchema.parse({
+    extractMode: data.extractMode ?? "auto",
     titleTemplate: data.titleTemplate ?? null,
     messageTemplate: data.messageTemplate ?? null,
     tagsTemplate: data.tagsTemplate ?? null,
@@ -239,6 +247,7 @@ export async function updateWebhook(
         description: data.description || null,
         enabled: data.enabled,
         requireAuth: data.requireAuth,
+        extractMode: templates.extractMode,
         titleTemplate: templates.titleTemplate ?? null,
         messageTemplate: templates.messageTemplate ?? null,
         tagsTemplate: templates.tagsTemplate ?? null,

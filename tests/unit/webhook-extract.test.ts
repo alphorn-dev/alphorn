@@ -4,6 +4,7 @@ import { extractFromPayload, extractFromText } from "@/lib/webhook-extract";
 describe("extractFromPayload", () => {
   it("uses the template when set", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { action: "opened", issue: { title: "Bug", body: "details" } },
       headers: {},
       templates: {
@@ -19,6 +20,7 @@ describe("extractFromPayload", () => {
 
   it("falls back to heuristic when template is null", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { title: "Hi", message: "Hello" },
       headers: {},
       templates: {
@@ -34,6 +36,7 @@ describe("extractFromPayload", () => {
 
   it("falls back to heuristic when template resolves to empty", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { title: "Heuristic title", message: "Heuristic message" },
       headers: {},
       templates: {
@@ -49,6 +52,7 @@ describe("extractFromPayload", () => {
 
   it("falls back to stringified JSON when message is still empty", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { unrelated: { stuff: 42 } },
       headers: {},
       templates: {
@@ -67,6 +71,7 @@ describe("extractFromPayload", () => {
     const huge: Record<string, string> = {};
     for (let i = 0; i < 500; i++) huge[`k${i}`] = "v".repeat(20);
     const result = extractFromPayload({
+      mode: "template",
       body: huge,
       headers: {},
       templates: {
@@ -81,6 +86,7 @@ describe("extractFromPayload", () => {
 
   it("supports header access for alphanumeric names via $headers", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { issue: { title: "Bug" } },
       headers: { xevent: "issues" },
       templates: {
@@ -95,6 +101,7 @@ describe("extractFromPayload", () => {
 
   it("strips sensitive headers before exposing to templates", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { issue: { title: "Bug" } },
       headers: {
         authorization: "Bearer secret",
@@ -116,6 +123,7 @@ describe("extractFromPayload", () => {
   it("truncates very long templated titles to 200 chars", () => {
     const long = "x".repeat(500);
     const result = extractFromPayload({
+      mode: "template",
       body: { title: long },
       headers: {},
       templates: {
@@ -131,6 +139,7 @@ describe("extractFromPayload", () => {
   it("truncates very long templated messages to 4000 chars", () => {
     const long = "y".repeat(5000);
     const result = extractFromPayload({
+      mode: "template",
       body: { message: long },
       headers: {},
       templates: {
@@ -145,6 +154,7 @@ describe("extractFromPayload", () => {
 
   it("parses tags from a template that resolves to comma string", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { repo: "alphorn", env: "prod" },
       headers: {},
       templates: {
@@ -159,6 +169,7 @@ describe("extractFromPayload", () => {
 
   it("parses priority from a template that resolves to a number string", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { level: 3 },
       headers: {},
       templates: {
@@ -173,6 +184,7 @@ describe("extractFromPayload", () => {
 
   it("falls back to heuristic priority/tags when templates resolve empty", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { message: "hi", priority: 9, tags: ["alert"] },
       headers: {},
       templates: {
@@ -188,6 +200,7 @@ describe("extractFromPayload", () => {
 
   it("clamps a template priority that resolves out of range", () => {
     const result = extractFromPayload({
+      mode: "template",
       body: { level: 2147483648 },
       headers: {},
       templates: {

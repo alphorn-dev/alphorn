@@ -44,6 +44,7 @@ function buildRow(overrides: Record<string, unknown> = {}) {
     requireAuth: false,
     enabled: true,
     deletedAt: null,
+    extractMode: "auto",
     titleTemplate: null,
     messageTemplate: null,
     tagsTemplate: null,

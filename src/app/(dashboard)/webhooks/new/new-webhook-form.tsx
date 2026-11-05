@@ -17,13 +17,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SOURCE_PRESETS, getSourcePreset } from "@/lib/webhook-extract/presets";
+  MessageFormatFields,
+  EMPTY_TEMPLATES,
+  type MessageTemplates,
+} from "@/components/message-format-fields";
+import type { ExtractMode } from "@/lib/webhook-extract/presets";
 import { ArrowLeft, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
@@ -42,11 +40,8 @@ export default function NewWebhookForm({
   const [description, setDescription] = useState("");
   const [selectedChannels, setSelectedChannels] = useState<ChannelSelection[]>([]);
   const [requireAuth, setRequireAuth] = useState(false);
-  const [titleTemplate, setTitleTemplate] = useState("");
-  const [messageTemplate, setMessageTemplate] = useState("");
-  const [tagsTemplate, setTagsTemplate] = useState("");
-  const [priorityTemplate, setPriorityTemplate] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [extractMode, setExtractMode] = useState<ExtractMode>("auto");
+  const [templates, setTemplates] = useState<MessageTemplates>(EMPTY_TEMPLATES);
   const [saving, setSaving] = useState(false);
   // Set once the webhook is created; holds the one-time plaintext key to reveal.
   const [created, setCreated] = useState<{ id: string; apiKey: string | null } | null>(null);
@@ -72,10 +67,11 @@ export default function NewWebhookForm({
         channelFilters: Object.fromEntries(
           selectedChannels.map((s) => [s.channelId, s.filter])
         ),
-        titleTemplate: titleTemplate || null,
-        messageTemplate: messageTemplate || null,
-        tagsTemplate: tagsTemplate || null,
-        priorityTemplate: priorityTemplate || null,
+        extractMode,
+        titleTemplate: templates.titleTemplate || null,
+        messageTemplate: templates.messageTemplate || null,
+        tagsTemplate: templates.tagsTemplate || null,
+        priorityTemplate: templates.priorityTemplate || null,
       });
       toast.success("Webhook created");
       // The plaintext key is returned once and never stored — reveal it here
@@ -91,17 +87,6 @@ export default function NewWebhookForm({
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
-  }
-
-  function applyPreset(id: string) {
-    const preset = getSourcePreset(id);
-    if (!preset) return;
-    setTitleTemplate(preset.titleTemplate);
-    setMessageTemplate(preset.messageTemplate);
-    setTagsTemplate(preset.tagsTemplate);
-    setPriorityTemplate(preset.priorityTemplate);
-    setAdvancedOpen(true);
-    toast.success(`Applied ${preset.label} preset`);
   }
 
   if (created) {
@@ -217,88 +202,16 @@ export default function NewWebhookForm({
           <Label>{requireAuth ? "API key required" : "No API key (URL is the secret)"}</Label>
         </div>
 
-        <div className="space-y-3 rounded-md border p-4">
-          <button
-            type="button"
-            className="text-sm font-medium"
-            onClick={() => setAdvancedOpen((o) => !o)}
-          >
-            {advancedOpen ? "▼" : "▶"} Advanced: field templates
-          </button>
-          {advancedOpen && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Override how title, message, tags and priority are extracted
-                from the incoming payload. Use <code>{"{path.to.field}"}</code>{" "}
-                syntax — e.g. <code>{"{issue.title}"}</code>. Leave empty to use
-                automatic detection.
-              </p>
-              <div className="space-y-2">
-                <Label>Source preset (optional)</Label>
-                <Select
-                  onValueChange={(v) => {
-                    if (typeof v === "string") applyPreset(v);
-                  }}
-                  disabled={saving}
-                >
-                  <SelectTrigger className="w-full max-w-xs">
-                    <SelectValue placeholder="Fill templates from a known source…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOURCE_PRESETS.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Pre-fills the template fields below for a common webhook
-                  source. You can edit them afterwards.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title-tpl">Title template</Label>
-                <Input
-                  id="title-tpl"
-                  value={titleTemplate}
-                  onChange={(e) => setTitleTemplate(e.target.value)}
-                  placeholder="{action}: {issue.title}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="message-tpl">Message template</Label>
-                <Textarea
-                  id="message-tpl"
-                  value={messageTemplate}
-                  onChange={(e) => setMessageTemplate(e.target.value)}
-                  placeholder="{issue.body}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tags-tpl">Tags template (comma-separated)</Label>
-                <Input
-                  id="tags-tpl"
-                  value={tagsTemplate}
-                  onChange={(e) => setTagsTemplate(e.target.value)}
-                  placeholder="github,{repository.name}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority-tpl">Priority template (number)</Label>
-                <Input
-                  id="priority-tpl"
-                  value={priorityTemplate}
-                  onChange={(e) => setPriorityTemplate(e.target.value)}
-                  placeholder="{severity}"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-          )}
+        <div className="rounded-md border p-4">
+          <MessageFormatFields
+            mode={extractMode}
+            templates={templates}
+            onChange={(mode, next) => {
+              setExtractMode(mode);
+              setTemplates(next);
+            }}
+            disabled={saving}
+          />
         </div>
 
         <div className="flex gap-3">

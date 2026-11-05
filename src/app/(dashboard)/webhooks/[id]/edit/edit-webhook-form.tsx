@@ -11,6 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  MessageFormatFields,
+  type MessageTemplates,
+} from "@/components/message-format-fields";
+import type { ExtractMode } from "@/lib/webhook-extract/presets";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
@@ -22,6 +27,7 @@ interface WebhookData {
   description: string | null;
   enabled: boolean;
   requireAuth: boolean;
+  extractMode: string;
   channels: { channelId: string; filter: unknown }[];
   titleTemplate: string | null;
   messageTemplate: string | null;
@@ -50,18 +56,16 @@ export default function EditWebhookForm({
       filter: (wc.filter as FilterDefinition | null) ?? null,
     }))
   );
-  const [titleTemplate, setTitleTemplate] = useState(webhook.titleTemplate ?? "");
-  const [messageTemplate, setMessageTemplate] = useState(webhook.messageTemplate ?? "");
-  const [tagsTemplate, setTagsTemplate] = useState(webhook.tagsTemplate ?? "");
-  const [priorityTemplate, setPriorityTemplate] = useState(webhook.priorityTemplate ?? "");
-  const [advancedOpen, setAdvancedOpen] = useState(
-    Boolean(
-      webhook.titleTemplate ||
-      webhook.messageTemplate ||
-      webhook.tagsTemplate ||
-      webhook.priorityTemplate
-    )
+  const [extractMode, setExtractMode] = useState<ExtractMode>(
+    // Only written through the Zod-validated webhook actions.
+    webhook.extractMode as ExtractMode
   );
+  const [templates, setTemplates] = useState<MessageTemplates>({
+    titleTemplate: webhook.titleTemplate ?? "",
+    messageTemplate: webhook.messageTemplate ?? "",
+    tagsTemplate: webhook.tagsTemplate ?? "",
+    priorityTemplate: webhook.priorityTemplate ?? "",
+  });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -87,10 +91,11 @@ export default function EditWebhookForm({
         channelFilters: Object.fromEntries(
           selectedChannels.map((s) => [s.channelId, s.filter])
         ),
-        titleTemplate: titleTemplate || null,
-        messageTemplate: messageTemplate || null,
-        tagsTemplate: tagsTemplate || null,
-        priorityTemplate: priorityTemplate || null,
+        extractMode,
+        titleTemplate: templates.titleTemplate || null,
+        messageTemplate: templates.messageTemplate || null,
+        tagsTemplate: templates.tagsTemplate || null,
+        priorityTemplate: templates.priorityTemplate || null,
       });
       toast.success("Webhook updated");
       router.push("/webhooks");
@@ -177,64 +182,16 @@ export default function EditWebhookForm({
           />
         </div>
 
-        <div className="space-y-3 rounded-md border p-4">
-          <button
-            type="button"
-            className="text-sm font-medium"
-            onClick={() => setAdvancedOpen((o) => !o)}
-          >
-            {advancedOpen ? "▼" : "▶"} Advanced: field templates
-          </button>
-          {advancedOpen && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Override how title, message, tags and priority are extracted
-                from the incoming payload. Use <code>{"{path.to.field}"}</code>{" "}
-                syntax — e.g. <code>{"{issue.title}"}</code>. Leave empty to use
-                automatic detection.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="title-tpl">Title template</Label>
-                <Input
-                  id="title-tpl"
-                  value={titleTemplate}
-                  onChange={(e) => setTitleTemplate(e.target.value)}
-                  placeholder="{action}: {issue.title}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="message-tpl">Message template</Label>
-                <Textarea
-                  id="message-tpl"
-                  value={messageTemplate}
-                  onChange={(e) => setMessageTemplate(e.target.value)}
-                  placeholder="{issue.body}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tags-tpl">Tags template (comma-separated)</Label>
-                <Input
-                  id="tags-tpl"
-                  value={tagsTemplate}
-                  onChange={(e) => setTagsTemplate(e.target.value)}
-                  placeholder="github,{repository.name}"
-                  disabled={saving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority-tpl">Priority template (number)</Label>
-                <Input
-                  id="priority-tpl"
-                  value={priorityTemplate}
-                  onChange={(e) => setPriorityTemplate(e.target.value)}
-                  placeholder="{severity}"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-          )}
+        <div className="rounded-md border p-4">
+          <MessageFormatFields
+            mode={extractMode}
+            templates={templates}
+            onChange={(mode, next) => {
+              setExtractMode(mode);
+              setTemplates(next);
+            }}
+            disabled={saving}
+          />
         </div>
 
         <div className="flex gap-3">

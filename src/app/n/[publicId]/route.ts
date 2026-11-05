@@ -180,6 +180,7 @@ export async function POST(
     const extracted = extractFromPayload({
       body,
       headers,
+      mode: webhook.extractMode,
       templates: {
         titleTemplate: webhook.titleTemplate,
         messageTemplate: webhook.messageTemplate,

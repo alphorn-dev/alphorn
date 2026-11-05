@@ -1,5 +1,7 @@
 import { resolveTemplate } from "./template";
 import { clampPriority, extractHeuristic } from "./heuristic";
+import { extractAuto } from "./auto";
+import type { ExtractMode } from "./presets";
 
 interface WebhookTemplates {
   titleTemplate: string | null;
@@ -11,6 +13,8 @@ interface WebhookTemplates {
 interface ExtractInput {
   body: Record<string, unknown>;
   headers: Record<string, string>;
+  /** "auto": known-source formatting, "none": generic heuristic only, "template": use `templates`. */
+  mode: ExtractMode;
   templates: WebhookTemplates;
   /** Pre-normalized title/message (e.g. from a Slack-compatible payload) used instead of the generic heuristic guess when there's no template. */
   fallback?: { title: string | null; message: string };
@@ -84,8 +88,33 @@ function truncate(value: string, max: number): string {
   return value.length > max ? value.slice(0, max) : value;
 }
 
+const NO_TEMPLATES: WebhookTemplates = {
+  titleTemplate: null,
+  messageTemplate: null,
+  tagsTemplate: null,
+  priorityTemplate: null,
+};
+
+function finalize(result: ExtractResult, body: Record<string, unknown>): ExtractResult {
+  const message =
+    result.message || JSON.stringify(body, null, JSON_FALLBACK_INDENT);
+  return {
+    title: result.title ? truncate(result.title, TITLE_MAX) : null,
+    message: truncate(message, MESSAGE_MAX),
+    priority: result.priority,
+    tags: result.tags,
+  };
+}
+
 export function extractFromPayload(input: ExtractInput): ExtractResult {
-  const { body, headers, templates, fallback } = input;
+  const { body, headers, mode, fallback } = input;
+
+  if (mode === "auto") {
+    const auto = extractAuto(body, headers);
+    if (auto) return finalize(auto, body);
+  }
+
+  const templates = mode === "template" ? input.templates : NO_TEMPLATES;
   const context = buildContext(body, headers);
 
   const templatedTitle = resolveOrEmpty(templates.titleTemplate, context);
@@ -104,23 +133,13 @@ export function extractFromPayload(input: ExtractInput): ExtractResult {
   const heuristic = needsHeuristic ? extractHeuristic(body) : null;
 
   const title = templatedTitle || fallback?.title || heuristic?.title || null;
-  let message = templatedMessage || fallback?.message || heuristic?.message || "";
-
-  if (message.length === 0) {
-    message = JSON.stringify(body, null, JSON_FALLBACK_INDENT);
-  }
-
+  const message = templatedMessage || fallback?.message || heuristic?.message || "";
   const tags = templatedTags ? parseTags(templatedTags) : (heuristic?.tags ?? []);
   const priority = templatedPriority
     ? parsePriority(templatedPriority)
     : (heuristic?.priority ?? null);
 
-  return {
-    title: title ? truncate(title, TITLE_MAX) : null,
-    message: truncate(message, MESSAGE_MAX),
-    priority,
-    tags,
-  };
+  return finalize({ title, message, priority, tags }, body);
 }
 
 /** Extracts notification fields from a non-JSON (e.g. text/plain) webhook body via X-Title/X-Priority/X-Tags headers. */

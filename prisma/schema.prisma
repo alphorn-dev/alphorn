@@ -181,6 +181,10 @@ model Webhook {
   apiKeyPrefix   String
   publicId       String       @unique
   requireAuth      Boolean      @default(false)
+  // How title/message/tags/priority are derived from JSON payloads:
+  // "auto" (detect known sources, else generic guess), "none" (generic guess
+  // only) or "template" (the four templates below). See src/lib/webhook-extract.
+  extractMode      String       @default("auto")
   titleTemplate    String?
   messageTemplate  String?
   tagsTemplate     String?

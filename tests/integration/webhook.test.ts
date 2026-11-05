@@ -63,6 +63,7 @@ type MockWebhook = {
   enabled: boolean;
   requireAuth: boolean;
   apiKeyHash: string;
+  extractMode: "auto" | "none" | "template";
   titleTemplate: string | null;
   messageTemplate: string | null;
   tagsTemplate: string | null;
@@ -92,6 +93,7 @@ function buildWebhook(overrides: Partial<MockWebhook> = {}): MockWebhook {
     enabled: true,
     requireAuth: false,
     apiKeyHash: hashApiKey("secret-key"),
+    extractMode: "auto",
     titleTemplate: null,
     messageTemplate: null,
     tagsTemplate: null,

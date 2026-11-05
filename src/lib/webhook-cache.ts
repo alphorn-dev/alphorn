@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { prisma } from "./db";
 import { logger } from "./logger";
+import type { ExtractMode } from "./webhook-extract/presets";
 
 // Shape returned to the webhook route. This is a subset of the full Prisma
 // object with only the fields the receiver hot path needs, plus the related
@@ -12,6 +13,7 @@ export interface CachedWebhook {
   apiKeyHash: string;
   requireAuth: boolean;
   enabled: boolean;
+  extractMode: ExtractMode;
   titleTemplate: string | null;
   messageTemplate: string | null;
   tagsTemplate: string | null;
@@ -240,6 +242,8 @@ async function fetchWebhook(publicId: string): Promise<CachedWebhook | null> {
     apiKeyHash: row.apiKeyHash,
     requireAuth: row.requireAuth,
     enabled: row.enabled,
+    // Only written through the Zod-validated webhook actions.
+    extractMode: row.extractMode as ExtractMode,
     titleTemplate: row.titleTemplate,
     messageTemplate: row.messageTemplate,
     tagsTemplate: row.tagsTemplate,
