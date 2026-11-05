@@ -7,7 +7,7 @@ Self-hostable notification router. Receives webhooks, routes messages to 21+ cha
 - **Runtime**: Node.js 22.12+ (pg-boss requirement; CI uses Node 22, the Docker image Node 24). Package manager: **pnpm** only. Do not use npm or yarn, the lockfile is `pnpm-lock.yaml`.
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript 5
 - **UI**: shadcn/ui (base-nova style), Tailwind CSS 4, Lucide icons
-- **Auth**: Better Auth with organization + two-factor plugins. Social/OIDC login providers (GitHub, Google, Microsoft, generic OIDC) are env-driven in `src/lib/auth/providers.ts`.
+- **Auth**: Better Auth with organization + two-factor plugins. Social/OIDC login providers (GitHub, Google, Microsoft, generic OIDC) are env-driven in `src/lib/auth/providers.ts`. Sign-up gating (`DISABLE_SIGNUP`, first-user and invitation exceptions) lives in `src/lib/auth/signup.ts`.
 - **Database**: PostgreSQL 18 with Prisma 7. The client is generated to `src/generated/prisma`: import `prisma` from `@/lib/db` (or types from `@/generated/prisma/client`), **never from `@prisma/client`**.
 - **Jobs**: pg-boss (PostgreSQL-backed queue) for delivery retries. Policy in `src/worker/index.ts`: 5 retries, 30s delay with backoff, 5min timeout, completed jobs purged after 7 days, unstarted jobs dropped after 14 days. `src/worker/sweep.ts` re-enqueues stuck or undelivered deliveries; keep its thresholds consistent with the pg-boss timings.
 - **Streaming**: Custom SSE implementation for real-time updates
@@ -39,8 +39,9 @@ Self-hostable notification router. Receives webhooks, routes messages to 21+ cha
 - `src/lib/sse/`: in-memory SSE connection registry for real-time streaming.
 - `src/app/api/auth/[...all]`: Better Auth catch-all handler.
 - `src/app/n/[publicId]`: public webhook receiver endpoint.
+- `public/openapi.json`: hand-written spec for the public API (`/n/{publicId}`, `/api/stream/{publicId}`). Changing a status code or adding a public route requires updating it; `tests/unit/openapi.test.ts` fails on drift.
 - `src/lib/filter/`: filter DSL. Zod discriminated unions over conditions (priority, tags, title, message, payload) with regex support via `safe-regex2`.
-- `src/lib/webhook-extract/`: extraction of title/message/priority/tags from webhook payloads. Per-webhook `extractMode`: `auto` (known-source formatters in `auto.ts`, the primary path: add new sources there), `template` (user-authored templates), `none` (generic heuristic).
+- `src/lib/webhook-extract/`: extraction of title/message/priority/tags from webhook payloads. Per-webhook `extractMode`: `auto` (known-source formatters, the primary path: one file per source in `sources/<name>.ts`, registered in order in `sources/index.ts`; add new sources there and a case to `tests/unit/webhook-sources/registry.test.ts`), `template` (user-authored templates), `none` (generic heuristic).
 - `src/lib/webhook-loop/`: loop detection (same-host hop counting) to prevent webhook cycles.
 - `src/lib/webhook-cache.ts`: per-instance cache of webhook configs for the hot receiver path. Kept coherent across instances by Postgres triggers that `NOTIFY alphorn_cache_invalidate` (defined in migration SQL), with a 30s TTL as fallback. Writes to cached tables invalidate automatically; do not add a parallel invalidation mechanism.
 - **Runtime modes**: `MODE=all|web|worker` selects embedded worker vs. standalone. For horizontally scaled SSE, run a dedicated SSE server (`pnpm sse-server`, `src/sse-server/`) with `SSE_MODE=standalone` and `SSE_INTERNAL_SECRET` shared across instances.

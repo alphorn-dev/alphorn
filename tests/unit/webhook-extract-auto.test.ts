@@ -202,3 +202,79 @@ describe("extractFromPayload modes", () => {
     expect(result.title).toBe("T: Hi");
   });
 });
+
+describe("extractAuto: Alchemy", () => {
+  const usdcTransfer = {
+    fromAddress: "0x1111111111111111111111111111111111111111",
+    toAddress: "0x2222222222222222222222222222222222222222",
+    hash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    value: 1234,
+    asset: "USDC",
+    category: "token",
+    rawContract: { address: "0x3333333333333333333333333333333333333333", decimals: 6 },
+    log: { removed: false },
+  };
+  const addressActivity = (activity: unknown[]) => ({
+    webhookId: "wh_test",
+    id: "whevt_test",
+    type: "ADDRESS_ACTIVITY",
+    event: { network: "AVAX_MAINNET", activity },
+  });
+
+  it("formats a single token transfer", () => {
+    expect(extractAuto(addressActivity([usdcTransfer]), {})).toEqual({
+      title: "[AVAX_MAINNET] 1234 USDC 0x1111…1111 → 0x2222…2222",
+      message:
+        "- 1234 USDC 0x1111…1111 → 0x2222…2222\n  tx 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      priority: null,
+      tags: ["alchemy", "address_activity", "avax_mainnet", "usdc"],
+    });
+  });
+
+  it("summarizes multiple transfers and flags reorgs", () => {
+    const result = extractAuto(
+      addressActivity([usdcTransfer, { ...usdcTransfer, log: { removed: true } }]),
+      { "x-alchemy-signature": "sig" }
+    );
+    expect(result?.title).toBe("Reorg: [AVAX_MAINNET] 2 transfers");
+    expect(result?.priority).toBe(4);
+  });
+
+  it("formats NFT transfers with a decimal token id", () => {
+    const result = extractAuto(
+      {
+        webhookId: "wh_x",
+        type: "NFT_ACTIVITY",
+        event: {
+          network: "ETH_MAINNET",
+          activity: [
+            {
+              fromAddress: "0x715af6b6c6e3aefb97f1f6811ce52db563b38896",
+              toAddress: "0x29469395eaf6f95920e59f858042f0e28d98a20b",
+              contractAddress: "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
+              erc721TokenId: "0x1eeb",
+              category: "erc721",
+            },
+          ],
+        },
+      },
+      {}
+    );
+    expect(result?.title).toBe("[ETH_MAINNET] 0xbc4c…f13d #7915 0x715a…8896 → 0x2946…a20b");
+  });
+
+  it("lists transaction hashes for custom (GRAPHQL) webhooks", () => {
+    const tx = { transaction: { hash: "0xabc" } };
+    const result = extractAuto(
+      { webhookId: "wh_x", type: "GRAPHQL", event: { data: { block: { logs: [tx, tx] } } } },
+      {}
+    );
+    expect(result).toMatchObject({ title: "Alchemy custom webhook: 1 transaction", message: "- tx 0xabc" });
+  });
+
+  it("does not throw on malformed payloads", () => {
+    expect(() =>
+      extractAuto({ webhookId: "wh_x", type: "NFT_ACTIVITY", event: { activity: [{ erc721TokenId: "zz" }] } }, {})
+    ).not.toThrow();
+  });
+});
