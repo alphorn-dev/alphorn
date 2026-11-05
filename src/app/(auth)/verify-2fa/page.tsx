@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { factorState } from "@/lib/auth/second-factor-hooks";
 import { getRawSession, getSession, isSecondFactorPending } from "@/lib/auth/server";
@@ -33,7 +34,12 @@ export default async function Verify2FAPage({
     );
   }
 
-  // No session: Better Auth's TOTP sign-in challenge. The user may have passkeys too; a
-  // passkey sign-in replaces the challenge.
+  // No session: only Better Auth's TOTP sign-in challenge (its signed `two_factor` cookie, with
+  // or without the __Secure- prefix) belongs here. Anyone else starts at the sign-in page.
+  const challenge = (await cookies()).getAll().some((c) => c.name.endsWith("better-auth.two_factor"));
+  if (!challenge) {
+    redirect(target ? `/sign-in?redirect=${encodeURIComponent(redirectTo)}` : "/sign-in");
+  }
+  // The user may have passkeys too; a passkey sign-in replaces the challenge.
   return <VerifyForm passkey totp redirectTo={redirectTo} />;
 }

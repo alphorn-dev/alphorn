@@ -138,6 +138,25 @@ describe("adding a passkey", () => {
     ).rejects.toMatchObject({ status: "FORBIDDEN" });
   });
 
+  it("cleans up expired confirmations when a new one is recorded", async () => {
+    const u = await signUp();
+    const [s] = await sessionsOf(u.userId);
+    await prisma.verification.create({
+      data: {
+        id: nanoid(), identifier: "passkey-reauth:gone-session", value: u.userId,
+        expiresAt: new Date(Date.now() - 1000),
+      },
+    });
+    await grantPasskeyReauth(s.id, u.userId);
+    await grantPasskeyReauth(s.id, u.userId);
+
+    const rows = await prisma.verification.findMany({
+      where: { identifier: { startsWith: "passkey-reauth:" } },
+      select: { identifier: true },
+    });
+    expect(rows).toEqual([{ identifier: `passkey-reauth:${s.id}` }]);
+  });
+
   it("does not accept an expired confirmation", async () => {
     const u = await signUp();
     const [s] = await sessionsOf(u.userId);
@@ -291,5 +310,36 @@ describe("passkey sign-in", () => {
 
     await secondFactorAfter(fakeCtx);
     expect(await prisma.session.count({ where: { id: old.id } })).toBe(0);
+  });
+});
+
+describe("project requiring 2FA", () => {
+  /** A password user without a factor whose active project requires 2FA. */
+  async function lockedOut() {
+    const u = await signUp();
+    const org = await auth.api.createOrganization({
+      body: { name: "P", slug: `p-${nanoid(8).toLowerCase()}` },
+      headers: u.headers,
+    });
+    await auth.api.setActiveOrganization({ body: { organizationId: org!.id }, headers: u.headers });
+    await prisma.organizationSettings.create({
+      data: { organizationId: org!.id, requireTwoFactor: true },
+    });
+    return { ...u, orgId: org!.id };
+  }
+
+  it("lets a session that doesn't meet it clear its active project", async () => {
+    const u = await lockedOut();
+    await auth.api.setActiveOrganization({ body: { organizationId: null }, headers: u.headers });
+    const s = await prisma.session.findFirstOrThrow({ where: { userId: u.userId } });
+    expect(s.activeOrganizationId).toBeNull();
+  });
+
+  it("still refuses to make that project active", async () => {
+    const u = await lockedOut();
+    await auth.api.setActiveOrganization({ body: { organizationId: null }, headers: u.headers });
+    await expect(
+      auth.api.setActiveOrganization({ body: { organizationId: u.orgId }, headers: u.headers }),
+    ).rejects.toMatchObject({ status: "FORBIDDEN" });
   });
 });

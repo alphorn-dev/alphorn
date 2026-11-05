@@ -84,13 +84,21 @@ async function assertOrg2FA(ctx: Parameters<typeof getSessionFromCtx>[0]): Promi
 
   const body = ctx.body as { organizationId?: string | null; organizationSlug?: string } | undefined;
   const query = ctx.query as { organizationId?: string; organizationSlug?: string } | undefined;
+  // set-active with organizationId: null clears the active project (resolveActiveOrgId() does
+  // this for a locked one). Checked before the `??` below, which turns null into "no id given"
+  // and would test the active, locked project instead.
+  if (
+    ctx.path === "/organization/set-active" &&
+    body?.organizationId === null &&
+    !body.organizationSlug
+  ) {
+    return;
+  }
   let orgId: string | null | undefined = body?.organizationId ?? query?.organizationId;
   const slug = body?.organizationSlug ?? query?.organizationSlug;
   if (!orgId && slug) {
     orgId = (await prisma.organization.findUnique({ where: { slug }, select: { id: true } }))?.id;
   }
-  // set-active with organizationId: null clears the active project.
-  if (orgId === null && ctx.path === "/organization/set-active") return;
   orgId ??= session.session.activeOrganizationId;
   if (!orgId) return;
 

@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { auth } from ".";
 import { sessionSatisfies2FA } from "./two-factor-policy";
 import { factorState } from "./second-factor-hooks";
@@ -112,7 +113,10 @@ export const getSession = cache(async () => {
 export const requireSession = cache(async () => {
   const session = await getSession();
   if (!session) {
-    throw new Error("Unauthorized");
+    // Signed out, or the second factor is still owed. redirect() is control flow, not an error:
+    // pages rendered next to the layout's own redirect, and actions fired from a page whose
+    // session just ended (e.g. the project switcher), no longer log or report an error.
+    redirect((await isSecondFactorPending()) ? "/verify-2fa" : "/sign-in");
   }
 
   const orgId = session.session.activeOrganizationId;

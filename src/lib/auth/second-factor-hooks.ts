@@ -101,7 +101,16 @@ async function assertRecentAuth(s: SessionWithFactor, path: string): Promise<voi
 export async function grantPasskeyReauth(sessionId: string, userId: string): Promise<void> {
   const identifier = passkeyReauthId(sessionId);
   await prisma.$transaction([
-    prisma.verification.deleteMany({ where: { identifier } }),
+    // This session's previous confirmation, and expired ones of any session (nothing else
+    // removes them; they're never read again).
+    prisma.verification.deleteMany({
+      where: {
+        OR: [
+          { identifier },
+          { identifier: { startsWith: passkeyReauthId("") }, expiresAt: { lt: new Date() } },
+        ],
+      },
+    }),
     prisma.verification.create({
       data: {
         id: randomUUID(),
