@@ -33,7 +33,10 @@ export function formatSseEvent(
         parts.push(JSON.stringify(extra));
       }
     }
-    return `data: ${parts.join(" | ")}\n\n`;
+    // Every line needs its own "data:" prefix, or a newline in the text starts a new SSE field
+    // (event:, id:, retry:) or event. Clients rejoin the lines with "\n".
+    const lines = parts.join(" | ").split(/\r\n|\r|\n/);
+    return `${lines.map((l) => `data: ${l}`).join("\n")}\n\n`;
   }
 
   const data: Record<string, unknown> = {

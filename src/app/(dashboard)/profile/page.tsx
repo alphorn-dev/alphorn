@@ -1,7 +1,10 @@
+import { getAuthenticatorName } from "@better-auth/passkey";
 import {
   requireSession,
   currentUserHasPassword,
 } from "@/lib/auth/server";
+import { prisma } from "@/lib/db";
+import { formatDate } from "@/lib/format-date";
 import { ProfileTabs } from "./profile-tabs";
 import { getOrgs2FARequirements } from "../settings/actions";
 import { isMailerConfigured } from "@/lib/email/mailer";
@@ -9,12 +12,15 @@ import { isMailerConfigured } from "@/lib/email/mailer";
 export default async function ProfilePage() {
   const session = await requireSession();
 
-  const [orgsRequiring2FA, userHasPassword] = await Promise.all([
+  const [orgsRequiring2FA, userHasPassword, passkeys] = await Promise.all([
     getOrgs2FARequirements(),
     currentUserHasPassword(),
+    prisma.passkey.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, aaguid: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
-  // 2FA self-management requires a password, so the capability equals hasPassword.
-  const can2FA = userHasPassword;
 
   return (
     <div className="max-w-2xl">
@@ -24,10 +30,13 @@ export default async function ProfilePage() {
       </p>
       <ProfileTabs
         orgsRequiring2FACount={orgsRequiring2FA.length}
-        has2FAEnabled={!!session.user.twoFactorEnabled}
-        can2FA={can2FA}
         mailerConfigured={isMailerConfigured()}
         userHasPassword={userHasPassword}
+        passkeys={passkeys.map((p) => ({
+          id: p.id,
+          label: p.name || getAuthenticatorName(p.aaguid) || "Passkey",
+          added: p.createdAt ? formatDate(p.createdAt) : null,
+        }))}
       />
     </div>
   );

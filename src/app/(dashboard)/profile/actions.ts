@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireSession } from "@/lib/auth/server";
+import { grantPasskeyReauth } from "@/lib/auth/second-factor-hooks";
+import { APIError } from "better-auth/api";
 import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
 import {
@@ -44,6 +46,35 @@ export async function requestEmailChange(
     body: { newEmail: newEmail.trim().toLowerCase() },
   });
 
+  return { ok: true };
+}
+
+export type ConfirmPasswordResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid_password" }
+  | { ok: false; reason: "rate_limited"; retryAfterSec: number };
+
+/** Re-authentication before adding or removing a passkey (PASSKEY_REAUTH_PATHS in @/lib/auth/second-factor). */
+export async function confirmPasswordForPasskey(password: string): Promise<ConfirmPasswordResult> {
+  const session = await requireSession();
+
+  try {
+    await enforceRateLimit(`app:confirmPassword:${session.user.id}`, 5, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, reason: "rate_limited", retryAfterSec: Math.ceil(err.retryAfterMs / 1000) };
+    }
+    throw err;
+  }
+
+  try {
+    await auth.api.verifyPassword({ headers: await headers(), body: { password: String(password) } });
+  } catch (err) {
+    if (err instanceof APIError) return { ok: false, reason: "invalid_password" };
+    throw err;
+  }
+
+  await grantPasskeyReauth(session.session.id, session.user.id);
   return { ok: true };
 }
 

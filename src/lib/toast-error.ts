@@ -36,6 +36,8 @@ function isUserFriendly(msg: string): boolean {
   if (!msg.trim()) return false;
   if (msg.length > MAX_LEN) return false;
   if (/An unexpected response was received from the server/i.test(msg)) return false;
+  // Production React replaces thrown Server Action messages with this (#441).
+  if (/Minified React error|react\.dev\/errors/.test(msg)) return false;
   if (/Invalid `prisma\./.test(msg)) return false;
   if (/PrismaClient/.test(msg)) return false;
   if (/\n\s*at\s/.test(msg)) return false;

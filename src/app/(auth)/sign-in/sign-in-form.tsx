@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import { Fingerprint, KeyRound } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import type { EnabledProvider } from "@/lib/auth/providers";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,9 @@ export function SignInForm({
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
   const redirectTo = redirectParam ? sanitizeRedirect(redirectParam) : null;
+  // Every sign-in that isn't a passkey passes /verify-2fa: it asks for the second factor if the
+  // account has one, and forwards straight to the target otherwise.
+  const afterFirstFactor = `/verify-2fa?redirect=${encodeURIComponent(redirectTo || "/")}`;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,8 +83,19 @@ export function SignInForm({
     setSocialLoading(provider.id);
     await authClient.signIn.social({
       provider: provider.id,
-      callbackURL: redirectTo || "/",
+      callbackURL: afterFirstFactor,
     });
+  }
+
+  async function handlePasskeySignIn() {
+    setLoading(true);
+    const res = await authClient.signIn.passkey();
+    if (res?.error) {
+      showError(res.error, "Failed to sign in with passkey");
+      setLoading(false);
+      return;
+    }
+    router.push(redirectTo || "/");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -95,7 +109,7 @@ export function SignInForm({
 
     if (error) {
       if (error.status === 403 && error.code === "TWO_FACTOR_REQUIRED") {
-        router.push(`/verify-2fa${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ""}`);
+        router.push(afterFirstFactor);
         return;
       }
       if (error.status === 403 && error.code === "EMAIL_NOT_VERIFIED") {
@@ -108,7 +122,7 @@ export function SignInForm({
       return;
     }
 
-    router.push(redirectTo || "/");
+    router.push(afterFirstFactor);
   }
 
   if (unverifiedEmail) {
@@ -173,7 +187,7 @@ export function SignInForm({
           </div>
         </CardContent>
       )}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -212,6 +226,16 @@ export function SignInForm({
         <CardFooter className="flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign in"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={loading || socialLoading !== null}
+            onClick={handlePasskeySignIn}
+          >
+            <Fingerprint className="size-4" />
+            Sign in with passkey
           </Button>
           {(signupOpen || redirectTo?.startsWith("/accept-invitation/")) && (
             <p className="text-sm text-muted-foreground">

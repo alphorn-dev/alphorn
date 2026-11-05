@@ -31,10 +31,12 @@ export function DeliveriesTable({
   messageId,
   initialDeliveries,
   isAdminOrOwner,
+  canResend,
 }: {
   messageId: string;
   initialDeliveries: Delivery[];
   isAdminOrOwner: boolean;
+  canResend: boolean;
 }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [resending, setResending] = useState<Record<string, boolean>>({});
@@ -135,7 +137,7 @@ export function DeliveriesTable({
                   <Loader2 data-icon="inline-start" className="animate-spin" />
                   Processing
                 </Button>
-              ) : isAdminOrOwner && (
+              ) : isAdminOrOwner && canResend && (
                 <Button
                   size="sm"
                   variant="outline"

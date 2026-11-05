@@ -144,7 +144,7 @@ export async function updateRequireTwoFactor(requireTwoFactor: boolean) {
     const satisfies = await currentUserSatisfies2FA();
     if (!satisfies) {
       throw new Error(
-        "Enable 2FA on your own account before requiring it for the organization",
+        "Add a passkey or an authenticator app to your own account before requiring it for the organization",
       );
     }
   }

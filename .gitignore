@@ -4,6 +4,7 @@
 /.local/
 .claude
 .playwright-mcp
+reviews/
 
 # dependencies
 /node_modules

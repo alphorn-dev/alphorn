@@ -14,6 +14,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { formatDateTime } from "@/lib/format-date";
 import { getMemberRole } from "@/lib/auth/server";
+import { isWithinRetryWindow } from "@/worker/deliver";
 
 export default async function MessageDetailPage({
   params,
@@ -94,6 +95,9 @@ export default async function MessageDetailPage({
           <DeliveriesTable
             messageId={message.id}
             isAdminOrOwner={role === "owner" || role === "admin"}
+            // Deliveries are created with their message; the worker never sends
+            // rows past the retry window, so resend would only fail.
+            canResend={isWithinRetryWindow(message.createdAt)}
             initialDeliveries={message.deliveries.map((d) => ({
               id: d.id,
               channelId: d.channelId,

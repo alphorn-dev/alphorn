@@ -30,6 +30,7 @@
     "build:worker": "esbuild src/worker/standalone.ts --bundle --platform=node --format=esm --outfile=worker.mjs --alias:@=./src --packages=external --banner:js='import{createRequire}from\"module\";const require=createRequire(import.meta.url);'",
     "dev:worker": "npx tsx src/worker/standalone.ts",
     "sse-server": "npx tsx src/sse-server/index.ts",
+    "reset-2fa": "npx tsx --env-file-if-exists=.env scripts/reset-second-factor.ts",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
@@ -38,6 +39,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@better-auth/passkey": "~1.7.17",
     "@paddle/paddle-node-sdk": "^3.11.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",

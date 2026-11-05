@@ -26,6 +26,7 @@ model User {
   members          Member[]
   invitations      Invitation[]
   twoFactors       TwoFactor[]
+  passkeys         Passkey[]
   usedInviteLinks  InviteLink[]
   createdInviteLinks InviteLink[] @relation("inviteLinkCreator")
 }
@@ -43,6 +44,8 @@ model Session {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   activeOrganizationId String?
+  secondFactorAt       DateTime?
+  ssoSignInAt          DateTime?
 
   @@index([userId])
 }
@@ -86,6 +89,24 @@ model TwoFactor {
   user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime?
+  aaguid       String?
+
+  @@index([userId])
+  @@index([credentialID])
 }
 
 model RateLimit {

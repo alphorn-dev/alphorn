@@ -9,7 +9,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
-import { MAX_DELIVERY_AGE_MS } from "@/worker/deliver";
+import { isWithinRetryWindow } from "@/worker/deliver";
 import {
   checkMessageQuotaForSubscription,
   getOrCreateSubscription,
@@ -170,7 +170,7 @@ export async function resendDelivery(deliveryId: string) {
   }
   // The worker never sends rows past the retry window, so a resend would sit
   // PENDING forever.
-  if (delivery.createdAt.getTime() < Date.now() - MAX_DELIVERY_AGE_MS) {
+  if (!isWithinRetryWindow(delivery.createdAt)) {
     throw new Error("Deliveries older than 24 hours can't be resent");
   }
 

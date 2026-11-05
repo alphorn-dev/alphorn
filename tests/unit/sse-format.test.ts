@@ -118,6 +118,16 @@ describe("formatSseEvent - text format", () => {
     expect(parts[1]).toBe("Deploy Complete");
     expect(parts[2]).toBe("done");
   });
+
+  it("prefixes every line so newlines can't inject SSE fields or events", () => {
+    const event = formatSseEvent(
+      { title: "", message: "a\n\nevent: evil\r\nid: 1\rretry: 1" },
+      { ...textConfig, includePayload: false }
+    );
+    const lines = event.slice(0, -2).split("\n");
+    expect(lines).toHaveLength(5);
+    expect(lines.every((l) => l.startsWith("data: "))).toBe(true);
+  });
 });
 
 describe("formatSseEvent - JSON omissions", () => {

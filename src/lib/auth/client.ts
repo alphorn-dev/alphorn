@@ -3,6 +3,7 @@ import {
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
+import { passkeyClient } from "@better-auth/passkey/client";
 
 export const authClient = createAuthClient({
   plugins: [
@@ -10,6 +11,7 @@ export const authClient = createAuthClient({
     twoFactorClient({
       twoFactorPage: "/verify-2fa",
     }),
+    passkeyClient(),
   ],
 });
 

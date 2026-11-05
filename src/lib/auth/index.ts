@@ -3,11 +3,14 @@ import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/a
 import { organization } from "better-auth/plugins/organization";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { passkey } from "@better-auth/passkey";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../db";
 import { logger } from "../logger";
 import { isMailerConfigured, sendMail } from "../email/mailer";
-import { userSatisfies2FA } from "./two-factor-policy";
+import { sessionSatisfies2FA } from "./two-factor-policy";
+import { secondFactorAfter, secondFactorBefore } from "./second-factor-hooks";
+import { PASSKEY_SIGN_IN_PATH, SSO_SIGN_IN_PATHS } from "./second-factor";
 import { canCreateUser } from "./signup";
 import { truncate } from "@/channels/truncate";
 import {
@@ -96,7 +99,7 @@ async function assertOrg2FA(ctx: Parameters<typeof getSessionFromCtx>[0]): Promi
     select: { requireTwoFactor: true },
   });
   if (!settings?.requireTwoFactor) return;
-  if (await userSatisfies2FA(session.user.id, session.user.twoFactorEnabled ?? false)) return;
+  if (await sessionSatisfies2FA(session)) return;
 
   throw new APIError("FORBIDDEN", {
     message: "Two-factor authentication is required for this project",
@@ -159,9 +162,20 @@ export const auth = betterAuth({
         },
       }
     : undefined,
+  session: {
+    additionalFields: {
+      // When this session proved a passkey / authenticator app (./second-factor.ts). Server-set only.
+      secondFactorAt: { type: "date", required: false, input: false },
+      // When this session was created by an SSO sign-in (two-factor-policy.ts). Server-set only.
+      ssoSignInAt: { type: "date", required: false, input: false },
+    },
+  },
   user: {
     changeEmail: mailerReady ? { enabled: true } : undefined,
   },
+  // HTTP only (auth.api calls still work): email changes go through requestEmailChange() in
+  // profile/actions.ts, which checks the current password first.
+  disabledPaths: ["/change-email"],
   account: {
     accountLinking: {
       enabled: true,
@@ -194,6 +208,20 @@ export const auth = betterAuth({
     storage: "database",
   },
   databaseHooks: {
+    session: {
+      create: {
+        // Signing in with a passkey proves the second factor on its own; an SSO sign-in is
+        // trusted for project 2FA requirements. Bound to this session, not the user.
+        before: async (session, ctx) => {
+          if (ctx?.path === PASSKEY_SIGN_IN_PATH) {
+            return { data: { ...session, secondFactorAt: new Date() } };
+          }
+          if (ctx?.path && SSO_SIGN_IN_PATHS.includes(ctx.path)) {
+            return { data: { ...session, ssoSignInAt: new Date() } };
+          }
+        },
+      },
+    },
     user: {
       create: {
         // Every account-creating path (email sign-up, social, OIDC) lands here.
@@ -209,6 +237,9 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Pending sessions, passkey names, wrong-code limit (./second-factor-hooks.ts).
+      await secondFactorBefore(ctx);
+
       if (ctx.path === "/sign-up/email") {
         const email = ctx.body?.email as string | undefined;
         const password = ctx.body?.password as string | undefined;
@@ -240,6 +271,9 @@ export const auth = betterAuth({
         await assertOrg2FA(ctx);
       }
     }),
+    // Marks a session verified, resets the wrong-code count, signs out other sessions when a
+    // factor is removed (./second-factor-hooks.ts).
+    after: createAuthMiddleware(secondFactorAfter),
   },
   plugins: [
     organization({
@@ -264,6 +298,21 @@ export const auth = betterAuth({
     }),
     twoFactor({
       issuer: "Alphorn",
+      // SSO-only users can set up an authenticator app too; users with a password still
+      // confirm it.
+      allowPasswordless: true,
+    }),
+    // rpID and origin default to BETTER_AUTH_URL's host/origin.
+    passkey({
+      rpName: "Alphorn",
+      authenticatorSelection: {
+        // A passkey sign-in counts as 2FA, so the authenticator must verify the
+        // user (biometric or PIN), not just presence. Enforced at registration
+        // and at every sign-in.
+        userVerification: "required",
+        // Discoverable credentials, so "Sign in with passkey" needs no email.
+        residentKey: "required",
+      },
     }),
     ...(process.env.OIDC_CLIENT_ID
       ? [

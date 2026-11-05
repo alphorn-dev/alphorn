@@ -62,8 +62,9 @@ export function SecuritySettings({
           <div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Enable 2FA on your own account first (Profile → Security) before
-              requiring it for everyone, or you will lock yourself out.
+              Add a passkey or an authenticator app to your own account first
+              (Profile → Security) before requiring it for everyone, or you will
+              lock yourself out.
             </span>
           </div>
         )}

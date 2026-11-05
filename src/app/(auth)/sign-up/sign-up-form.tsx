@@ -202,7 +202,7 @@ export function SignUpForm({
           </div>
         </CardContent>
       )}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>

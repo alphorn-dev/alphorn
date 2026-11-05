@@ -1,7 +1,9 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { auth } from ".";
-import { userSatisfies2FA } from "./two-factor-policy";
+import { sessionSatisfies2FA } from "./two-factor-policy";
+import { factorState } from "./second-factor-hooks";
+import { secondFactorPending } from "./second-factor";
 
 async function resolveActiveOrgId(
   userId: string,
@@ -10,12 +12,21 @@ async function resolveActiveOrgId(
 ): Promise<string | null> {
   const { prisma } = await import("../db");
 
-  if (currentOrgId && !satisfies2FA) {
-    const settings = await prisma.organizationSettings.findUnique({
-      where: { organizationId: currentOrgId },
-      select: { requireTwoFactor: true },
+  if (currentOrgId) {
+    // Removing a member doesn't touch their sessions, so re-check membership on every request.
+    const member = await prisma.member.findFirst({
+      where: { organizationId: currentOrgId, userId },
+      select: { id: true },
     });
-    if (settings?.requireTwoFactor) {
+    const locked =
+      !satisfies2FA &&
+      !!(
+        await prisma.organizationSettings.findUnique({
+          where: { organizationId: currentOrgId },
+          select: { requireTwoFactor: true },
+        })
+      )?.requireTwoFactor;
+    if (!member || locked) {
       await auth.api.setActiveOrganization({
         headers: await headers(),
         body: { organizationId: null },
@@ -59,16 +70,32 @@ async function resolveActiveOrgId(
   return selectedOrgId;
 }
 
-export const getSession = cache(async () => {
-  const session = await auth.api.getSession({
+/** The Better Auth session as stored, pending or not. Prefer getSession(). */
+export const getRawSession = cache(async () =>
+  auth.api.getSession({
     headers: await headers(),
-  });
-  if (!session) return null;
+  }),
+);
 
-  const satisfies2FA = await userSatisfies2FA(
-    session.user.id,
-    session.user.twoFactorEnabled ?? false,
+/**
+ * Signed in, but this session still owes its second factor (./second-factor.ts). Such a
+ * session counts as signed out everywhere; send the user to /verify-2fa.
+ */
+export const isSecondFactorPending = cache(async (): Promise<boolean> => {
+  const session = await getRawSession();
+  if (!session) return false;
+  return secondFactorPending(
+    await factorState(session.user.id),
+    session.session.secondFactorAt ?? null,
   );
+});
+
+/** The signed-in session, or null when signed out or the second factor is still pending. */
+export const getSession = cache(async () => {
+  const session = await getRawSession();
+  if (!session || (await isSecondFactorPending())) return null;
+
+  const satisfies2FA = await sessionSatisfies2FA(session);
   const resolvedOrgId = await resolveActiveOrgId(
     session.user.id,
     session.session.activeOrganizationId ?? null,
@@ -90,10 +117,7 @@ export const requireSession = cache(async () => {
 
   const orgId = session.session.activeOrganizationId;
   if (orgId) {
-    const satisfies2FA = await userSatisfies2FA(
-      session.user.id,
-      session.user.twoFactorEnabled ?? false,
-    );
+    const satisfies2FA = await sessionSatisfies2FA(session);
     if (!satisfies2FA) {
       const { prisma } = await import("../db");
       const settings = await prisma.organizationSettings.findUnique({
@@ -152,7 +176,8 @@ export const currentUserHasPassword = cache(async (): Promise<boolean> => {
   if (!session) return false;
   const { prisma } = await import("../db");
   const credential = await prisma.account.findFirst({
-    where: { userId: session.user.id, providerId: "credential" },
+    // With a hash, like hasPassword() in ./second-factor-hooks.ts and Better Auth itself.
+    where: { userId: session.user.id, providerId: "credential", password: { not: null } },
     select: { id: true },
   });
   return !!credential;
@@ -166,31 +191,25 @@ export const currentUserHasPassword = cache(async (): Promise<boolean> => {
 export const currentUserHas2FACapability = currentUserHasPassword;
 
 /**
- * Whether the current session user satisfies the "has 2FA" bar used by
- * org-level 2FA enforcement: TOTP enabled, OR signed in via a trusted SSO
- * provider. Returns false when there is no session.
+ * Whether the current session satisfies the "has 2FA" bar used by org-level
+ * 2FA enforcement (see sessionSatisfies2FA). Returns false when there is no
+ * session.
  */
 export const currentUserSatisfies2FA = cache(async (): Promise<boolean> => {
   const session = await getSession();
   if (!session) return false;
-  return userSatisfies2FA(
-    session.user.id,
-    session.user.twoFactorEnabled ?? false,
-  );
+  return sessionSatisfies2FA(session);
 });
 
 /**
  * Orgs whose `requireTwoFactor` the current user fails. Returns [] when the
- * user satisfies 2FA (TOTP enabled or SSO-trusted).
+ * session satisfies 2FA (proven TOTP/passkey, or an SSO sign-in session).
  */
 export const currentUserOrgs2FAGap = cache(async (): Promise<string[]> => {
   const session = await getSession();
   if (!session) return [];
 
-  const satisfies2FA = await userSatisfies2FA(
-    session.user.id,
-    session.user.twoFactorEnabled ?? false,
-  );
+  const satisfies2FA = await sessionSatisfies2FA(session);
   if (satisfies2FA) return [];
 
   const { prisma } = await import("../db");

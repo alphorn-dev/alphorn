@@ -80,7 +80,7 @@ function ResetPasswordForm() {
         <CardTitle className="text-2xl font-bold">Reset password</CardTitle>
         <CardDescription>Enter your new password below.</CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="password">New password</Label>

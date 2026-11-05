@@ -128,7 +128,7 @@ export function OrgSwitcher() {
                 onClick={() => {
                   if (isLocked) {
                     toast.error(
-                      "This project requires two-factor authentication. Enable 2FA in your profile to access it.",
+                      "This project requires two-factor authentication. Add a passkey or an authenticator app in your profile to access it.",
                     );
                     return;
                   }

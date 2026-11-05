@@ -26,6 +26,10 @@ export const CHANNEL_RATE_LIMITS_PER_MIN: Record<string, number> = {
 // state it is in or when its job arrives. Shared with the sweep in ./sweep.ts.
 export const MAX_DELIVERY_AGE_MS = 24 * 60 * 60 * 1000;
 
+export function isWithinRetryWindow(createdAt: Date): boolean {
+  return createdAt.getTime() >= Date.now() - MAX_DELIVERY_AGE_MS;
+}
+
 export interface DeliveryJobData {
   deliveryId: string;
   trace?: string[];

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/server";
+import { getSession, isSecondFactorPending } from "@/lib/auth/server";
 import { prisma } from "@/lib/db";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   const session = await getSession();
 
   if (!session) {
-    redirect("/sign-in");
+    redirect((await isSecondFactorPending()) ? "/verify-2fa" : "/sign-in");
   }
 
   // getSession auto-selects an accessible org. If none could be selected and
