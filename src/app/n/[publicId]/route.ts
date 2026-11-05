@@ -136,7 +136,7 @@ export async function POST(
   let payload: Record<string, unknown> | null;
   // Reuse the raw request text for the jsonb insert instead of re-serializing
   // the parsed object. Only safe when payload is exactly JSON.parse(rawBody)
-  // (a plain object) — set alongside payload in the JSON branch only.
+  // (a plain object) - set alongside payload in the JSON branch only.
   let payloadJson: string | undefined;
 
   // Any "json" content type (incl. application/*+json) is parsed as JSON, and

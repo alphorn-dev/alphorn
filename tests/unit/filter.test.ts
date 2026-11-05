@@ -66,7 +66,7 @@ describe("evaluateFilter", () => {
   });
 });
 
-describe("evaluateCondition — priority", () => {
+describe("evaluateCondition - priority", () => {
   it("equals", () => {
     const c: FilterCondition = { field: "priority", operator: "equals", value: 3 };
     expect(evaluateCondition(msg(), c)).toBe(true);
@@ -116,7 +116,7 @@ describe("evaluateCondition — priority", () => {
   });
 });
 
-describe("evaluateCondition — tags", () => {
+describe("evaluateCondition - tags", () => {
   it("has_any_of", () => {
     const c: FilterCondition = { field: "tags", operator: "has_any_of", value: ["critical", "other"] };
     expect(evaluateCondition(msg(), c)).toBe(true);
@@ -158,7 +158,7 @@ describe("evaluateCondition — tags", () => {
   });
 });
 
-describe("evaluateCondition — string fields (title, message)", () => {
+describe("evaluateCondition - string fields (title, message)", () => {
   it("equals (case-insensitive)", () => {
     const c: FilterCondition = { field: "title", operator: "equals", value: "test alert" };
     expect(evaluateCondition(msg(), c)).toBe(true);
@@ -205,7 +205,7 @@ describe("evaluateCondition — string fields (title, message)", () => {
   });
 });
 
-describe("evaluateCondition — payload", () => {
+describe("evaluateCondition - payload", () => {
   it("resolves nested path and matches", () => {
     const c: FilterCondition = { field: "payload", path: "source", operator: "equals", value: "monitor" };
     expect(evaluateCondition(msg(), c)).toBe(true);

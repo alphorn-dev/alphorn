@@ -152,7 +152,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Don'ts
 
-- No em dashes (—) in anything you write. Use a hyphen (-), comma, colon, or parentheses instead.
+- No em dashes (-) in anything you write. Use a hyphen (-), comma, colon, or parentheses instead.
 - No filler or pleasantries ("Great question!", "You're absolutely right"). Keep answers short and precise.
 - No git commands or commits unless explicitly asked. The user handles git.
 
@@ -160,8 +160,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+This version has breaking changes - APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+This block is written and re-added by `next dev` - verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->

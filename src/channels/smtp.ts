@@ -54,7 +54,7 @@ registerChannel({
       host: config.host,
       port: config.port,
       secure: isSecure(config.secure, config.port),
-      // Fail fast on unreachable/slow servers — nodemailer's defaults (up to
+      // Fail fast on unreachable/slow servers - nodemailer's defaults (up to
       // 10 min) would exceed the 5 min delivery job timeout.
       connectionTimeout: 15_000,
       greetingTimeout: 15_000,

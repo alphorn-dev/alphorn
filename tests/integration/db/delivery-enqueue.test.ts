@@ -45,7 +45,7 @@ async function seedWebhookWithChannels(count: number) {
   return { webhookId: webhook.id, channelIds };
 }
 
-describe("persistMessageAndEnqueueDeliveries — integration", () => {
+describe("persistMessageAndEnqueueDeliveries - integration", () => {
   it("inserts Message + Deliveries in one round-trip and enqueues one pg-boss job per delivery", async () => {
     const { webhookId, channelIds } = await seedWebhookWithChannels(3);
 

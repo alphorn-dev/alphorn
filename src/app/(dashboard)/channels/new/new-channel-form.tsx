@@ -183,7 +183,7 @@ export default function NewChannelForm({ appUrl }: { appUrl: string }) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Config form — left side */}
+        {/* Config form - left side */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="channel-name">Channel name</Label>
@@ -240,7 +240,7 @@ export default function NewChannelForm({ appUrl }: { appUrl: string }) {
           </div>
         </form>
 
-        {/* Setup guide — right side */}
+        {/* Setup guide - right side */}
         {handler?.setupGuide && (
           <div>
             <div className="lg:sticky lg:top-6">

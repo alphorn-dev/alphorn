@@ -8,7 +8,7 @@ export const meta: ChannelMeta = {
   hasTest: false,
   setupGuide: [
     "**How it works**",
-    "This channel streams notifications in real-time using Server-Sent Events (SSE). Any client that supports SSE can connect — browsers, `curl`, scripts, etc.",
+    "This channel streams notifications in real-time using Server-Sent Events (SSE). Any client that supports SSE can connect - browsers, `curl`, scripts, etc.",
     "",
     "**After creating this channel:**",
     "1. Link it to a webhook (just like any other channel)",

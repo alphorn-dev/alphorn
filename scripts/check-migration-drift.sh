@@ -2,7 +2,7 @@
 # Fails CI when schema.prisma and prisma/migrations disagree.
 #
 # Some objects live only in migration SQL and are invisible to Prisma's
-# datamodel — it would emit a DROP for them on the next `migrate dev` (that is
+# datamodel - it would emit a DROP for them on the next `migrate dev` (that is
 # how the Message trgm indexes got lost). Anything Prisma can express is
 # declared in schema.prisma; the rest is allow-listed below and must stay in
 # sync with the migrations that create it.

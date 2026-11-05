@@ -2,7 +2,7 @@
 
 ## Name
 
-**Alphorn** — named after the traditional Swiss mountain horn. The logo depicts a stylized alphorn on a teal circle.
+**Alphorn** - named after the traditional Swiss mountain horn. The logo depicts a stylized alphorn on a teal circle.
 
 Alphorn is always written with a capital "A" and lowercase for the rest. Never "ALPHORN", "AlpHorn", or "alphorn" in prose.
 
@@ -28,7 +28,7 @@ magick -background none public/logo.svg -resize 48x48 src/app/icon.png
 
 ### Usage in code
 
-Use a plain `<img>` tag for the SVG logo — `next/image` does not handle the mm-unit SVG correctly:
+Use a plain `<img>` tag for the SVG logo - `next/image` does not handle the mm-unit SVG correctly:
 
 ```tsx
 <img src="/logo.svg" alt="Alphorn" width={28} height={28} />
@@ -49,7 +49,7 @@ The primary brand color is **teal**, defined in OKLCH color space for perceptual
 | Role | Light mode | Dark mode | Hex (approx) |
 |------|-----------|-----------|---------------|
 | Primary | `oklch(0.55 0.14 175)` | `oklch(0.72 0.14 175)` | #00897b / #4db6ac |
-| Circle fill | — | — | #00897b |
+| Circle fill | - | - | #00897b |
 
 ### Semantic colors
 
@@ -69,7 +69,7 @@ The primary brand color is **teal**, defined in OKLCH color space for perceptual
 | Muted | `oklch(0.965 0 0)` | `oklch(0.17 0 0)` |
 | Border | `oklch(0.915 0 0)` | `oklch(1 0 0 / 8%)` |
 
-All colors are defined as CSS custom properties in `src/app/globals.css`. Always reference them via Tailwind utilities (`bg-primary`, `text-destructive`, etc.) — never hardcode color values.
+All colors are defined as CSS custom properties in `src/app/globals.css`. Always reference them via Tailwind utilities (`bg-primary`, `text-destructive`, etc.) - never hardcode color values.
 
 ## Typography
 

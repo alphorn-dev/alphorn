@@ -114,7 +114,7 @@ export function ChannelSelector({
               <div className="border-t px-3 pb-3 pt-2 space-y-3">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2">
-                    Filter — only deliver messages that match:
+                    Filter - only deliver messages that match:
                   </p>
                   <FilterBuilder
                     value={getFilter(ch.id)}

@@ -96,7 +96,7 @@ export const PRIORITY_LABELS: Record<number, string> = Object.fromEntries(
 
 /**
  * Map our 1-5 priority scale (see PRIORITY_OPTIONS) onto a channel's own
- * scale. `scale` gives the target value for priorities 1..5 in order —
+ * scale. `scale` gives the target value for priorities 1..5 in order -
  * repeat a value to bucket adjacent priorities together (e.g. a 4-level
  * severity scale collapses Min/Low into the same bucket). Channels with a
  * 1:1 mapping (e.g. ntfy) just list five distinct values.

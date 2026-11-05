@@ -307,13 +307,13 @@ model Subscription {
   // Message packs purchased in current period (reset on renewal)
   purchasedPacks        Int       @default(0)
 
-  // Manual overrides — null = use plan default, -1 = unlimited
+  // Manual overrides - null = use plan default, -1 = unlimited
   overrideMessageLimit  Int?
   overrideWebhookLimit  Int?
   overrideChannelLimit  Int?
   overrideRetentionDays Int?
 
-  // Last paddle subscription `updated_at` we applied — used to drop out-of-order webhooks
+  // Last paddle subscription `updated_at` we applied - used to drop out-of-order webhooks
   paddleUpdatedAt       DateTime?
 
   createdAt             DateTime  @default(now())
@@ -330,7 +330,7 @@ model PaddleEvent {
 
 // Append-only history of subscription state transitions. Used by the
 // retention job to reason about "when did this org's subscription actually
-// change" — something we cannot reconstruct from Subscription's last-write-wins
+// change" - something we cannot reconstruct from Subscription's last-write-wins
 // columns. Never update or delete rows here.
 model SubscriptionEvent {
   id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid

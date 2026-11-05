@@ -67,7 +67,7 @@ export default async function MetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold tabular-nums">
-              {metrics.avgLatencyMs !== null ? formatLatency(metrics.avgLatencyMs) : "—"}
+              {metrics.avgLatencyMs !== null ? formatLatency(metrics.avgLatencyMs) : "-"}
             </p>
           </CardContent>
         </Card>
@@ -78,7 +78,7 @@ export default async function MetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold tabular-nums">
-              {metrics.avgRetries !== null ? metrics.avgRetries : "—"}
+              {metrics.avgRetries !== null ? metrics.avgRetries : "-"}
             </p>
           </CardContent>
         </Card>

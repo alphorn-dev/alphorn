@@ -23,7 +23,7 @@ describe("Webhook soft-delete", () => {
       data: { deletedAt: new Date(), enabled: false },
     });
 
-    // Flush the in-process cache — in prod this happens via the
+    // Flush the in-process cache - in prod this happens via the
     // alphorn_cache_invalidate NOTIFY trigger; in tests we drive it manually.
     _resetWebhookCacheForTests();
     const cachedAfter = await getCachedWebhook(webhook.publicId);

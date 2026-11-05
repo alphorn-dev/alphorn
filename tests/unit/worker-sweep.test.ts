@@ -176,7 +176,7 @@ describe("startSweep", () => {
     await vi.advanceTimersByTimeAsync(60_000);
 
     // fresh FAILED (updatedAt too recent, still inside live-retry cadence) and
-    // >24h FAILED (createdAt too old) are excluded by these bounds — the query
+    // >24h FAILED (createdAt too old) are excluded by these bounds - the query
     // never returns them, so only genuinely lost rows are re-enqueued.
     expect(mocks.findMany).toHaveBeenCalledWith({
       where: {

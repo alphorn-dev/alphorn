@@ -149,7 +149,7 @@ export async function updateMemberRole(memberId: string, role: string) {
   if (!member) throw new Error("Member not found");
 
   if (member.role === "owner") {
-    throw new Error("Cannot change the role of an owner — use transfer ownership instead");
+    throw new Error("Cannot change the role of an owner - use transfer ownership instead");
   }
 
   await auth.api.updateMemberRole({

@@ -118,7 +118,7 @@ export default function EditChannelForm({
       </div>
 
       <div className="mt-6 flex flex-col lg:flex-row gap-6">
-        {/* Config form — left side */}
+        {/* Config form - left side */}
         <form onSubmit={handleSave} className="flex-1 min-w-0 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="channel-name">Channel name</Label>
@@ -226,7 +226,7 @@ export default function EditChannelForm({
           </div>
         </form>
 
-        {/* Setup guide — right side on large screens, below on small */}
+        {/* Setup guide - right side on large screens, below on small */}
         {handler?.setupGuide && (
           <div className="lg:w-[400px] lg:shrink-0">
             <div className="lg:sticky lg:top-6">

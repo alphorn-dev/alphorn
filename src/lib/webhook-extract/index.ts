@@ -122,7 +122,7 @@ export function extractFromPayload(input: ExtractInput): ExtractResult {
   const templatedTags = resolveOrEmpty(templates.tagsTemplate, context);
   const templatedPriority = resolveOrEmpty(templates.priorityTemplate, context);
 
-  // The heuristic walks the whole body guessing at fields — skip it when
+  // The heuristic walks the whole body guessing at fields - skip it when
   // templates (plus, for title/message, the Slack fallback) already cover
   // everything, since it's wasted work on the hot webhook-receiving path.
   const needsHeuristic =

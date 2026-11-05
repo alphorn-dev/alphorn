@@ -8,7 +8,7 @@ export const meta: ChannelMeta = {
   hasTest: true,
   setupGuide: [
     "**Highly recommended: create a dedicated user**",
-    "The access token grants full access to the account that issued it — including reading all messages and joining or leaving rooms. Create a separate Matrix user for Alphorn and invite it to the room, rather than using your personal account's token.",
+    "The access token grants full access to the account that issued it - including reading all messages and joining or leaving rooms. Create a separate Matrix user for Alphorn and invite it to the room, rather than using your personal account's token.",
     "",
     "**Step 1: Get your access token**",
     "Sign in as the dedicated user in Element, then go to **Settings** > **Help & About** > scroll to **Access Token** and copy it.",

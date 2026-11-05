@@ -198,12 +198,12 @@ export function FilterTestPanel({ filter }: FilterTestPanelProps) {
                 {result.overall ? (
                   <span className="flex items-center gap-2">
                     <Check className="h-4 w-4" />
-                    Match — would be delivered
+                    Match - would be delivered
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
                     <X className="h-4 w-4" />
-                    No match — would be filtered out
+                    No match - would be filtered out
                   </span>
                 )}
               </div>

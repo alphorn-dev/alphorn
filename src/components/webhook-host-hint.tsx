@@ -18,7 +18,7 @@ export function WebhookHostHint({ url, appUrl }: { url: string; appUrl: string }
       }`}
     >
       {conflict
-        ? `This URL points at ${host} — the current Alphorn instance. Webhook channels cannot target this server.`
+        ? `This URL points at ${host} - the current Alphorn instance. Webhook channels cannot target this server.`
         : `Note: the URL cannot point at ${host} (this Alphorn instance). Attach channels directly to your webhook to deliver here.`}
     </div>
   );

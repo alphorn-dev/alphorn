@@ -161,7 +161,7 @@ async function startListener(): Promise<void> {
     client.on("error", (err) => {
       logger.warn(
         { component: "webhook-cache", err: err.message },
-        "LISTEN client error — cache falls back to TTL-only until reconnect",
+        "LISTEN client error - cache falls back to TTL-only until reconnect",
       );
       // Drop client; next cache miss will retry startListener.
       state.client = null;
@@ -181,7 +181,7 @@ async function startListener(): Promise<void> {
           component: "webhook-cache",
           err: err instanceof Error ? err.message : String(err),
         },
-        "Could not start LISTEN — cache will operate in TTL-only mode",
+        "Could not start LISTEN - cache will operate in TTL-only mode",
       );
       state.available = false;
       try {
@@ -284,7 +284,7 @@ export async function getCachedWebhook(
   publicId: string,
 ): Promise<CachedWebhook | null> {
   // Start the LISTEN client opportunistically on first access. We don't wait
-  // for it — if it fails we fall back to TTL-only, and in the meantime this
+  // for it - if it fails we fall back to TTL-only, and in the meantime this
   // request still gets the fresh row it just fetched.
   const state = getListenerState();
   if (state.available && !state.client && !state.starting) {
@@ -303,7 +303,7 @@ export async function getCachedWebhook(
   }
 
   // Capture generations before the read so an invalidation racing the fetch
-  // is detected below — the row we get back may predate the update.
+  // is detected below - the row we get back may predate the update.
   const globalGen = generations.global;
   const publicIdGen = generations.byPublicId.get(publicId) ?? 0;
 
@@ -316,7 +316,7 @@ export async function getCachedWebhook(
     const target = value === null ? negativeCache : cache;
     const max = value === null ? MAX_NEGATIVE_CACHE_ENTRIES : MAX_CACHE_ENTRIES;
     if (target.size >= max) {
-      // Drop the oldest insertion — Map preserves insertion order.
+      // Drop the oldest insertion - Map preserves insertion order.
       const oldest = target.keys().next().value;
       if (oldest !== undefined) target.delete(oldest);
     }

@@ -32,7 +32,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
     return;
   }
 
-  // Don't create infinite loops — skip if the failure channel is the same as the failed channel
+  // Don't create infinite loops - skip if the failure channel is the same as the failed channel
   if (settings.failureNotificationChannelId === delivery.channelId) return;
 
   const failureChannel = await prisma.channel.findUnique({
@@ -47,7 +47,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
   try {
     // Parse first so the failure channel gets the same Zod defaults/coercion
     // every other send path applies (mirrors deliver.ts). A parse failure or
-    // unknown handler is swallowed by the catch — a broken failure channel
+    // unknown handler is swallowed by the catch - a broken failure channel
     // must not crash the delivery that triggered this notification.
     const config = handler.configSchema.parse(failureChannel.config);
     await handler.send(config, {
@@ -68,7 +68,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
       "Failure notification sent"
     );
   } catch (err) {
-    // Silently fail — we don't want failure notifications to cause more failures
+    // Silently fail - we don't want failure notifications to cause more failures
     logger.error({ error: err instanceof Error ? err.message : "Unknown error", failureChannelId: failureChannel.id, failureChannelType: failureChannel.type }, "Failed to send failure notification");
   }
 }

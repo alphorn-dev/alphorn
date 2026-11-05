@@ -13,7 +13,7 @@ export const meta: ChannelMeta = {
       type: "text",
       required: true,
       helpText:
-        "The URL that will receive POST/PUT requests. It cannot point at this Alphorn instance — to deliver to a webhook here, attach channels directly to that webhook.",
+        "The URL that will receive POST/PUT requests. It cannot point at this Alphorn instance - to deliver to a webhook here, attach channels directly to that webhook.",
       placeholder: "https://api.example.com/notifications",
     },
     {

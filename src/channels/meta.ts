@@ -25,7 +25,7 @@ import { meta as vonageSms } from "./vonage-sms.meta";
 export type { ChannelMeta };
 
 /**
- * Client-safe channel metadata. No Node.js dependencies — used by UI
+ * Client-safe channel metadata. No Node.js dependencies - used by UI
  * components to render channel lists and config forms. Each channel's
  * metadata lives once, in its `<type>.meta.ts` file, and is imported by
  * both this barrel and that channel's own handler (`<type>.ts`), so there

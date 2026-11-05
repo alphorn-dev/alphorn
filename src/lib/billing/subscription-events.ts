@@ -3,17 +3,17 @@ import type { Prisma } from "@/generated/prisma/client";
 /**
  * Normalized classification of a subscription state transition.
  *
- * - `created` — first event we've ever seen for an org's subscription
- * - `cancelled` — subscription became cancelled (Paddle "canceled" or a
+ * - `created` - first event we've ever seen for an org's subscription
+ * - `cancelled` - subscription became cancelled (Paddle "canceled" or a
  *   scheduled cancel-at-period-end)
- * - `paused` — subscription became paused
- * - `past_due` — subscription became past_due
- * - `reactivated` — came back to `active` from a non-active, non-trialing
+ * - `paused` - subscription became paused
+ * - `past_due` - subscription became past_due
+ * - `reactivated` - came back to `active` from a non-active, non-trialing
  *   state (after cancel, pause, past_due)
- * - `plan_changed` — plan switched while staying in the same status
- * - `updated` — fallback; some other change we didn't classify more specifically
+ * - `plan_changed` - plan switched while staying in the same status
+ * - `updated` - fallback; some other change we didn't classify more specifically
  *
- * Stored as `String` in Postgres intentionally — Prisma/Postgres enums are
+ * Stored as `String` in Postgres intentionally - Prisma/Postgres enums are
  * painful to evolve, and the retention job only cares about a few values.
  */
 type SubscriptionEventType =
@@ -40,13 +40,13 @@ interface SubscriptionTransitionInput {
  * plan or status actually changed, so we don't pollute the table with
  * no-op updates (Paddle sends a lot of those).
  *
- * The classifier field is normalized for query convenience — the retention
+ * The classifier field is normalized for query convenience - the retention
  * job cares about "when did this org become cancelled" and "when did it
  * come back", so those are first-class.
  *
  * Subtle limitation: this only records events that were actually applied to
  * the Subscription row. The Paddle webhook handler drops out-of-order events
- * via the `paddleUpdatedAt` guard, and those are silently skipped here too —
+ * via the `paddleUpdatedAt` guard, and those are silently skipped here too -
  * so the event log may miss intermediate transitions if Paddle delivers
  * events out of order. The canonical `Subscription` state is still correct.
  */

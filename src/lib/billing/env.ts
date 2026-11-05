@@ -13,7 +13,7 @@ const schema = z
       .default("production"),
   })
   .superRefine((env, ctx) => {
-    if (!env.PADDLE_API_KEY) return; // billing disabled — nothing else required
+    if (!env.PADDLE_API_KEY) return; // billing disabled - nothing else required
     const required = [
       "PADDLE_WEBHOOK_SECRET",
       "PADDLE_PRICE_ID_PRO",

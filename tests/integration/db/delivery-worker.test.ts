@@ -14,7 +14,7 @@ async function getDelivery(id: string) {
   return row;
 }
 
-describe("handleDelivery — worker integration", () => {
+describe("handleDelivery - worker integration", () => {
   it("marks the delivery DELIVERED on channel success and records one send call", async () => {
     const { deliveryId } = await createDeliveryFixture();
 

@@ -20,7 +20,7 @@ timing with you.
 
 Alphorn is under active development. Security fixes are applied to the
 `main` branch and the latest tagged release. Older releases are not
-maintained — please upgrade to receive security fixes.
+maintained - please upgrade to receive security fixes.
 
 ## Scope
 

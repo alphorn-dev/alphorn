@@ -8,7 +8,7 @@ async function createCredentialUser(email: string, password: string): Promise<{ 
     body: { email, password, name: "Test User" },
     asResponse: false,
   });
-  // signUpEmail returns { token, user } shape — pull the id from the user.
+  // signUpEmail returns { token, user } shape - pull the id from the user.
   const userId = (result as { user: { id: string } }).user.id;
   return { userId };
 }

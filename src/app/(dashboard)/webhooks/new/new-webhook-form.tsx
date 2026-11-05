@@ -74,7 +74,7 @@ export default function NewWebhookForm({
         priorityTemplate: templates.priorityTemplate || null,
       });
       toast.success("Webhook created");
-      // The plaintext key is returned once and never stored — reveal it here
+      // The plaintext key is returned once and never stored - reveal it here
       // before moving on. If auth is off, there is no key to show.
       setCreated({ id, apiKey: requireAuth ? apiKey : null });
     } catch (err) {
@@ -97,7 +97,7 @@ export default function NewWebhookForm({
             <CardTitle>Webhook created</CardTitle>
             <CardDescription>
               {created.apiKey
-                ? "Copy your API key now — it is shown only once and cannot be retrieved later."
+                ? "Copy your API key now - it is shown only once and cannot be retrieved later."
                 : "Your webhook is ready. The endpoint URL is the secret; keep it private."}
             </CardDescription>
           </CardHeader>

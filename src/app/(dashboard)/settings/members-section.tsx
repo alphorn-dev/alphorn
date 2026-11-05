@@ -364,7 +364,7 @@ export function MembersSection({
           <CardDescription>
             {mailerConfigured
               ? "Invite by email, or generate a single-use shareable link."
-              : "Email sending isn't configured on this server — use shareable links instead."}
+              : "Email sending isn't configured on this server - use shareable links instead."}
           </CardDescription>
         </CardHeader>
         <CardContent>

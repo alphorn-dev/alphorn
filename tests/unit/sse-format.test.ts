@@ -17,7 +17,7 @@ const fullConfig: SseConfig = {
   includePayload: true,
 };
 
-describe("formatSseEvent — JSON format", () => {
+describe("formatSseEvent - JSON format", () => {
   it("includes title, message, and timestamp", () => {
     vi.useFakeTimers({ now: new Date("2026-01-15T10:00:00Z") });
     const event = formatSseEvent(baseNotification, fullConfig);
@@ -69,7 +69,7 @@ describe("formatSseEvent — JSON format", () => {
   });
 });
 
-describe("formatSseEvent — text format", () => {
+describe("formatSseEvent - text format", () => {
   const textConfig: SseConfig = { ...fullConfig, format: "text" };
 
   it("produces pipe-separated output", () => {
@@ -120,7 +120,7 @@ describe("formatSseEvent — text format", () => {
   });
 });
 
-describe("formatSseEvent — JSON omissions", () => {
+describe("formatSseEvent - JSON omissions", () => {
   it("omits payload when it is not configured", () => {
     const event = formatSseEvent(baseNotification, { ...fullConfig, includePayload: false });
     const data = JSON.parse(event.replace("data: ", "").trim());

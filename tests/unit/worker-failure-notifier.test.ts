@@ -150,7 +150,7 @@ describe("notifyFailure", () => {
 
   it("parses the failure channel config before sending", async () => {
     const send = vi.fn().mockResolvedValue(undefined);
-    // A schema that injects a default the raw config lacks — send must receive
+    // A schema that injects a default the raw config lacks - send must receive
     // the parsed value, proving parse runs before send.
     const configSchema = {
       parse: (c: Record<string, unknown>) => ({ ...c, priority: 5 }),

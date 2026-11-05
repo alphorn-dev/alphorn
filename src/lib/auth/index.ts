@@ -138,7 +138,7 @@ export const auth = betterAuth({
         await trySendMail(
           "password reset",
           user.email,
-          "Reset your password — Alphorn",
+          "Reset your password - Alphorn",
           passwordResetEmailTemplate(url),
         );
       },
@@ -153,7 +153,7 @@ export const auth = betterAuth({
           await trySendMail(
             "verification",
             user.email,
-            "Verify your email — Alphorn",
+            "Verify your email - Alphorn",
             verificationEmailTemplate(url),
           );
         },
@@ -252,7 +252,7 @@ export const auth = betterAuth({
           await trySendMail(
             "invitation",
             email,
-            `You've been invited to ${truncate(org.name, 100)} — Alphorn`,
+            `You've been invited to ${truncate(org.name, 100)} - Alphorn`,
             invitationEmailTemplate(
               org.name,
               inviter.user.name || inviter.user.email,

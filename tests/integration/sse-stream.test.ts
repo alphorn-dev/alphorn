@@ -28,7 +28,7 @@ vi.mock("@/lib/sse/format", () => ({
   formatSseComment: mocks.formatSseComment,
 }));
 
-describe("GET /api/stream/:publicId — SSE streaming", () => {
+describe("GET /api/stream/:publicId - SSE streaming", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mocks.findChannel.mockReset();

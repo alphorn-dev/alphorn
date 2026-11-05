@@ -1,6 +1,6 @@
 /**
  * Minimal `{dotted.path}` template resolver used by webhook extraction.
- * Intentionally has no conditionals, loops, or helpers — users cannot
+ * Intentionally has no conditionals, loops, or helpers - users cannot
  * write logic into templates. Missing paths render as empty string.
  */
 

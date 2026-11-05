@@ -64,7 +64,7 @@ export async function getWebhooksForOrg() {
   if (!orgId) return [];
 
   // Never ship key material (apiKeyHash) or channel configs (credentials) to
-  // the list view — it only renders names, counts, and status.
+  // the list view - it only renders names, counts, and status.
   return prisma.webhook.findMany({
     where: { organizationId: orgId, deletedAt: null },
     select: {
@@ -179,7 +179,7 @@ export async function createWebhook(data: {
   });
 
   revalidatePath("/webhooks");
-  // Return the plaintext key once — it is never recoverable from the DB after
+  // Return the plaintext key once - it is never recoverable from the DB after
   // this. The caller shows it to the user and discards it.
   return { id: webhook.id, apiKey };
 }
@@ -235,7 +235,7 @@ export async function updateWebhook(
   });
 
   // Recreating the links would reset `enabled` to its default and silently
-  // un-mute channels toggled off via toggleWebhookChannel — carry it over.
+  // un-mute channels toggled off via toggleWebhookChannel - carry it over.
   const enabledByChannel = await loadLinkEnabledMap(id);
 
   await prisma.$transaction([

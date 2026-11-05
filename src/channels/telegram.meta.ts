@@ -15,11 +15,11 @@ export const meta: ChannelMeta = {
     "",
     "**Personal chat:** Open a conversation with your new bot (search for it by username) and send it any message (e.g. \"hello\"). Then open this URL in your browser:",
     "`https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`",
-    "Replace `<YOUR_BOT_TOKEN>` with the full token from Step 1 (the whole string including the colon, e.g. `123456:ABC-DEF...`). Look for `\"chat\":{\"id\":123456789}` in the response — that number is your Chat ID.",
+    "Replace `<YOUR_BOT_TOKEN>` with the full token from Step 1 (the whole string including the colon, e.g. `123456:ABC-DEF...`). Look for `\"chat\":{\"id\":123456789}` in the response - that number is your Chat ID.",
     "",
     "**Group chat:** Add the bot to a group, send any message in the group, then open the same URL above. The Chat ID for groups is a negative number like `-1001234567890`.",
     "",
-    "**Important:** You must send a message to the bot (or in the group) **before** testing. Bots cannot initiate conversations — they can only reply to chats where a user has already sent a message.",
+    "**Important:** You must send a message to the bot (or in the group) **before** testing. Bots cannot initiate conversations - they can only reply to chats where a user has already sent a message.",
   ].join("\n"),
   configFields: [
     {
@@ -27,7 +27,7 @@ export const meta: ChannelMeta = {
       label: "Bot Token",
       type: "password",
       required: true,
-      helpText: "From @BotFather — looks like 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+      helpText: "From @BotFather - looks like 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
       placeholder: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
     },
     {

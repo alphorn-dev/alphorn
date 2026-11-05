@@ -11,7 +11,7 @@ export class RateLimitError extends Error {
 // One atomic upsert so the cap holds under concurrent workers. Semantics:
 // the window restarts when the last accepted request is older than windowMs;
 // a rejected request never bumps lastRequest, so hammering cannot extend the
-// window. `count` may exceed `limit` (rejections still increment it) — only
+// window. `count` may exceed `limit` (rejections still increment it) - only
 // `count <= limit` means accepted.
 export async function enforceRateLimit(
   key: string,

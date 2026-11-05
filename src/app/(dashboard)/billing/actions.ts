@@ -94,7 +94,7 @@ export async function getMessagePackCheckoutData() {
   });
 
   if (!sub?.paddleSubscriptionId) {
-    throw new Error("No active subscription — upgrade first");
+    throw new Error("No active subscription - upgrade first");
   }
 
   const priceId = getMessagePackPriceId();
@@ -122,7 +122,7 @@ export async function getCustomerPortalUrl(): Promise<string> {
   });
 
   if (!sub?.paddleCustomerId) {
-    throw new Error("No billing customer yet — upgrade first");
+    throw new Error("No billing customer yet - upgrade first");
   }
 
   const portalSession = await paddle.customerPortalSessions.create(

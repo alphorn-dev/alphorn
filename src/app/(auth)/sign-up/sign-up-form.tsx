@@ -103,7 +103,7 @@ export function SignUpForm({
       return;
     }
 
-    // If email verification is required, no session is issued yet —
+    // If email verification is required, no session is issued yet -
     // show a confirmation message instead of redirecting.
     if (!data?.token) {
       setVerificationSentTo(email);
@@ -120,7 +120,7 @@ export function SignUpForm({
           slug: generateOrgSlug(projectName),
         });
       } catch {
-        // Non-critical — user can create a project manually
+        // Non-critical - user can create a project manually
       }
     }
 

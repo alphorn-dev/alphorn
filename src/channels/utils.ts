@@ -27,7 +27,7 @@ export function getAppUrl(): string {
   return u;
 }
 
-/** True when `url` resolves to this Alphorn instance — used to block webhook loops. */
+/** True when `url` resolves to this Alphorn instance - used to block webhook loops. */
 export function isSameHostAsApp(url: string): boolean {
   return compareHosts(url, getAppUrl());
 }

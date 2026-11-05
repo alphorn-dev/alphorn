@@ -112,7 +112,7 @@ function buildWebhook(overrides: Partial<MockWebhook> = {}): MockWebhook {
   };
 }
 
-describe("POST /n/:publicId — webhook receiver", () => {
+describe("POST /n/:publicId - webhook receiver", () => {
   beforeEach(() => {
     mocks.getCachedWebhook.mockReset();
     mocks.persistMessage.mockReset();

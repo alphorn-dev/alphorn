@@ -39,7 +39,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
 
   // Idempotency: only claim rows still eligible to send. PENDING/FAILED are
   // the normal lifecycle states; STALE means the sweep marked the row as not
-  // picked up in time — its job can still arrive late (worker downtime,
+  // picked up in time - its job can still arrive late (worker downtime,
   // backlog), so it stays claimable within the 24h retry window. Nothing
   // older than 24h is ever sent: expired rows stay STALE/FAILED. A DELIVERED
   // row means the channel already accepted this notification (pg-boss can
@@ -71,7 +71,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     }
     logger.info(
       { status: existing.status },
-      "Skipping delivery — not in a claimable state",
+      "Skipping delivery - not in a claimable state",
     );
     return;
   }
@@ -132,7 +132,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
             startAfter: delaySec,
           },
         ]);
-        jobLogger.info({ delaySec }, "Delivery throttled — rescheduled");
+        jobLogger.info({ delaySec }, "Delivery throttled - rescheduled");
         return;
       }
       throw err;

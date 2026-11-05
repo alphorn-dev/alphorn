@@ -12,7 +12,7 @@ function createBoss(): PgBoss {
       // LISTEN/NOTIFY wakes workers on new jobs instead of polling every ~2s,
       // giving sub-second pickup with near-zero idle DB load. Requires the
       // delivery queue's notify:true (see src/worker/index.ts). Holds one
-      // dedicated LISTEN connection — incompatible with PgBouncer transaction
+      // dedicated LISTEN connection - incompatible with PgBouncer transaction
       // pooling; self-hosters behind such a pooler get polling regardless.
       useListenNotify: true,
     });
@@ -22,7 +22,7 @@ function createBoss(): PgBoss {
 
 /**
  * Get the pgboss instance, ensuring it's started.
- * Safe to call multiple times — only starts once.
+ * Safe to call multiple times - only starts once.
  */
 export async function getQueue(): Promise<PgBoss> {
   const boss = createBoss();

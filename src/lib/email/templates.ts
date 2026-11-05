@@ -11,7 +11,7 @@ function layout(content: string): string {
 </td></tr>
 <tr><td style="padding:32px 40px">${content}</td></tr>
 <tr><td style="padding:16px 40px 32px;text-align:center">
-  <span style="font-size:12px;color:#a1a1aa">Alphorn — Notification Router</span>
+  <span style="font-size:12px;color:#a1a1aa">Alphorn - Notification Router</span>
 </td></tr>
 </table>
 </td></tr>

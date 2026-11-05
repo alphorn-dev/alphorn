@@ -28,7 +28,7 @@ export function WebhookCredentials({
   endpointUrl: string;
   requireAuth: boolean;
 }) {
-  // The full key only exists in memory right after regenerate — it is never
+  // The full key only exists in memory right after regenerate - it is never
   // stored, so once this reveal is gone the user must regenerate again.
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [endpointUrl, setEndpointUrl] = useState(initialEndpointUrl);
@@ -66,7 +66,7 @@ export function WebhookCredentials({
     setRequireAuth(checked);
     try {
       await updateWebhookRequireAuth(webhookId, checked);
-      toast.success(checked ? "API key required" : "API key disabled — URL is the secret");
+      toast.success(checked ? "API key required" : "API key disabled - URL is the secret");
     } catch {
       setRequireAuth(!checked);
       toast.error("Failed to update auth setting");
@@ -149,7 +149,7 @@ export function WebhookCredentials({
                   </Button>
                 </div>
                 <p className="text-sm text-warning">
-                  Copy this key now — it is shown only once and cannot be
+                  Copy this key now - it is shown only once and cannot be
                   retrieved later.
                 </p>
               </>

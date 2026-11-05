@@ -84,7 +84,7 @@ export function BillingClient({ data }: { data: BillingData }) {
     // Paddle's webhook usually lands within a second or two, but can take
     // longer. Poll the server every 1s for up to 20s, refreshing as soon as
     // the subscription reflects any change from the pre-checkout state
-    // (plan, hasSubscription, or pack count — covers upgrades + packs).
+    // (plan, hasSubscription, or pack count - covers upgrades + packs).
     async function pollUntilChanged() {
       const initial = await getSubscriptionStatus().catch(() => null);
       for (let i = 0; i < 20; i++) {
@@ -152,7 +152,7 @@ export function BillingClient({ data }: { data: BillingData }) {
     script.addEventListener("load", onLoad);
 
     // Script may have already finished loading between querySelector and
-    // addEventListener — `window.Paddle` is the source of truth, so re-check.
+    // addEventListener - `window.Paddle` is the source of truth, so re-check.
     ready();
 
     return () => {
@@ -251,7 +251,7 @@ export function BillingClient({ data }: { data: BillingData }) {
               Self-Hosted
             </CardTitle>
             <CardDescription>
-              Self-hosted — all features are unlimited.
+              Self-hosted - all features are unlimited.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -289,10 +289,10 @@ export function BillingClient({ data }: { data: BillingData }) {
             </div>
             <CardDescription>
               {data.plan === "free" && "Free plan with basic limits."}
-              {data.plan === "pro" && "Pro plan — €25/mo"}
-              {data.plan === "business" && "Business plan — €79/mo"}
+              {data.plan === "pro" && "Pro plan - €25/mo"}
+              {data.plan === "business" && "Business plan - €79/mo"}
               {data.plan === "enterprise" &&
-                "Enterprise plan — custom contract."}
+                "Enterprise plan - custom contract."}
               {data.currentPeriodEnd && (
                 <>
                   {" "}
@@ -404,7 +404,7 @@ export function BillingClient({ data }: { data: BillingData }) {
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         {loading === "pro"
                           ? "Loading..."
-                          : `${ctaVerb} to Pro — €25/mo`}
+                          : `${ctaVerb} to Pro - €25/mo`}
                       </Button>
                     )}
                     {showBusiness && (
@@ -416,7 +416,7 @@ export function BillingClient({ data }: { data: BillingData }) {
                         <ArrowUpRight className="mr-2 h-4 w-4" />
                         {loading === "business"
                           ? "Loading..."
-                          : `${ctaVerb} to Business — €79/mo`}
+                          : `${ctaVerb} to Business - €79/mo`}
                       </Button>
                     )}
                   </ActionRow>
@@ -427,7 +427,7 @@ export function BillingClient({ data }: { data: BillingData }) {
                     {hasPlanChangeOption && <Separator />}
                     <ActionRow
                       title="Extra messages"
-                      description="Running low this month? Add a message pack — 10,000 extra messages, valid until the end of your current billing period."
+                      description="Running low this month? Add a message pack - 10,000 extra messages, valid until the end of your current billing period."
                     >
                       <Button
                         variant="outline"
@@ -437,7 +437,7 @@ export function BillingClient({ data }: { data: BillingData }) {
                         <Package className="mr-2 h-4 w-4" />
                         {loading === "pack"
                           ? "Loading..."
-                          : "Buy Message Pack — €5"}
+                          : "Buy Message Pack - €5"}
                       </Button>
                     </ActionRow>
                   </>

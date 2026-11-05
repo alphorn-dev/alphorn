@@ -7,11 +7,11 @@ const logger = rootLogger.child({ component: "worker", task: "sweep" });
 
 const SWEEP_INTERVAL_MS = 60_000;
 const REENQUEUE_AFTER_MS = 120_000;  // re-enqueue undelivered deliveries after 2 min
-const STALE_AFTER_MS = 300_000;      // mark as STALE after 5 min — shown as undelivered
+const STALE_AFTER_MS = 300_000;      // mark as STALE after 5 min - shown as undelivered
 const REENQUEUE_PACE_MS = 900_000;   // re-enqueue a given row at most once per 15 min
 const PROCESSING_STUCK_MS = 600_000; // pg-boss job expiry is 300s (expireInSeconds in
-                                     // ./index.ts) — 10 min is safely past any live job
-const STUCK_FAILED_AFTER_MS = 600_000; // 10 min — safely past pg-boss's 30s-with-backoff
+                                     // ./index.ts) - 10 min is safely past any live job
+const STUCK_FAILED_AFTER_MS = 600_000; // 10 min - safely past pg-boss's 30s-with-backoff
                                        // retry cadence, so live retries are not disturbed
 
 const EXPIRED_ERROR = "Expired: undelivered after 24 hours";
@@ -41,7 +41,7 @@ export function startSweep() {
  * Deliveries still PENDING with 0 attempts after 5 minutes are marked STALE so
  * they show up in the dashboard as undelivered. They stay claimable and get
  * re-enqueued until they are 24 hours old. This update also bumps updatedAt,
- * which merely delays the row's first paced re-enqueue — acceptable.
+ * which merely delays the row's first paced re-enqueue - acceptable.
  */
 async function markStaleDeliveries() {
   const staleThreshold = new Date(Date.now() - STALE_AFTER_MS);
@@ -65,7 +65,7 @@ async function markStaleDeliveries() {
 
 /**
  * Deliveries PENDING or STALE with 0 attempts, older than 2 minutes but within
- * the 24h retry window, get re-enqueued — the pg-boss insert failed at
+ * the 24h retry window, get re-enqueued - the pg-boss insert failed at
  * creation, or the job was lost/expired during worker downtime. Paced: only
  * rows last touched over 15 minutes ago are picked, and the lastError note
  * below bumps updatedAt so the same row is not re-enqueued every sweep tick.
@@ -113,7 +113,7 @@ async function reenqueueOrphanedDeliveries() {
 }
 
 /**
- * A worker crash mid-send leaves rows PROCESSING forever — the pg-boss retry
+ * A worker crash mid-send leaves rows PROCESSING forever - the pg-boss retry
  * sees them as not claimable and gives up. After 10 minutes no live job can
  * still hold the row: mark it FAILED and re-enqueue it, unless it is past the
  * 24h retry window, in which case it stays FAILED without re-enqueue.
@@ -202,7 +202,7 @@ async function recoverLostFailedDeliveries() {
 
 /**
  * STALE deliveries with 0 attempts older than 24 hours are past the retry
- * window — record why, once (the lastError guard keeps this from rewriting
+ * window - record why, once (the lastError guard keeps this from rewriting
  * the same rows every tick). They stay STALE; the worker's claim in
  * ./deliver.ts never sends anything older than 24 hours.
  */

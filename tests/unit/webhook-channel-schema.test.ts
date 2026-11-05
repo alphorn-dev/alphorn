@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("webhook channel configSchema — same-host block", () => {
+describe("webhook channel configSchema - same-host block", () => {
   beforeEach(() => {
     process.env.BETTER_AUTH_URL = "https://app.alphorn.dev";
     process.env.BETTER_AUTH_SECRET = "test-secret";
@@ -46,7 +46,7 @@ describe("webhook channel configSchema — same-host block", () => {
   });
 });
 
-describe("webhook channel send — outbound headers", () => {
+describe("webhook channel send - outbound headers", () => {
   beforeEach(() => {
     process.env.BETTER_AUTH_URL = "https://app.alphorn.dev";
     process.env.BETTER_AUTH_SECRET = "test-secret";
@@ -87,7 +87,7 @@ describe("webhook channel send — outbound headers", () => {
   });
 });
 
-describe("webhook channel send — body shape", () => {
+describe("webhook channel send - body shape", () => {
   beforeEach(() => {
     process.env.BETTER_AUTH_URL = "https://app.alphorn.dev";
     process.env.BETTER_AUTH_SECRET = "test-secret";

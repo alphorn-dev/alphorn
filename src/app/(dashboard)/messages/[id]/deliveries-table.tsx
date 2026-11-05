@@ -78,7 +78,7 @@ export function DeliveriesTable({
   if (deliveries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No deliveries — this message was received but didn&apos;t match any channel filters.
+        No deliveries - this message was received but didn&apos;t match any channel filters.
       </p>
     );
   }

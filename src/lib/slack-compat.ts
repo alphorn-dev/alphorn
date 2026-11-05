@@ -48,9 +48,9 @@ export function isSlackPayload(body: Record<string, unknown>): boolean {
  * Extracts a title and message from a Slack-formatted payload.
  *
  * Resolution order:
- *   1. `text`  — the primary Slack message field
- *   2. Section blocks — concatenated text from Block Kit sections
- *   3. Attachments — first non-empty `fallback`, `text`, or `pretext`
+ *   1. `text`  - the primary Slack message field
+ *   2. Section blocks - concatenated text from Block Kit sections
+ *   3. Attachments - first non-empty `fallback`, `text`, or `pretext`
  *
  * Title is taken from the first attachment's `title` if present.
  */
@@ -64,7 +64,7 @@ export function normalizeSlackPayload(body: Record<string, unknown>): Normalized
 }
 
 // Array entries come from an untrusted payload and can be anything at runtime
-// (e.g. `blocks: [null]`) despite the SlackPayload cast — skip non-objects
+// (e.g. `blocks: [null]`) despite the SlackPayload cast - skip non-objects
 // before dereferencing their fields.
 function isObject(value: unknown): boolean {
   return typeof value === "object" && value !== null;

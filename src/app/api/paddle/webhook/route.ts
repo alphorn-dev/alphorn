@@ -219,7 +219,7 @@ async function dispatch(tx: Tx, event: EventEntity) {
  * Resolve the org for a subscription event. Falls back from customData →
  * paddleSubscriptionId → paddleCustomerId. Throws a RetryableError when the
  * subscription clearly belongs to us (has customerId/subId we know about) but
- * we can't link it yet — Paddle will retry until the checkout completes.
+ * we can't link it yet - Paddle will retry until the checkout completes.
  */
 async function resolveOrgIdForSubscription(
   tx: Tx,
@@ -232,7 +232,7 @@ async function resolveOrgIdForSubscription(
     // before Paddle signs it, so a bad actor could point at a victim org.
     // Reject permanently if the event's paddleCustomerId is already bound to
     // a different org, or the claimed org is already bound to a different
-    // paddleCustomerId — the binding must be consistent.
+    // paddleCustomerId - the binding must be consistent.
     const byCustomer = await tx.subscription.findUnique({
       where: { paddleCustomerId: data.customerId },
       select: { organizationId: true },
@@ -281,7 +281,7 @@ async function handleSubscriptionUpdate(
   if (!organizationId) {
     // The checkout's customData is the only authoritative source for the
     // very first event on a new subscription. If it's missing AND we have no
-    // existing record, ask Paddle to retry — by then the checkout flow will
+    // existing record, ask Paddle to retry - by then the checkout flow will
     // have stored the link.
     throw new RetryableError(
       `Cannot resolve organizationId for subscription ${data.id}`,
@@ -311,7 +311,7 @@ async function handleSubscriptionUpdate(
   // Trust Paddle's status verbatim (we spell "cancelled" with two L's
   // internally; everything else matches). A pending cancellation at period
   // end shows up as `scheduledChange.action === "cancel"` while status
-  // stays "active" — reflect that as "cancelled" so the UI shows it.
+  // stays "active" - reflect that as "cancelled" so the UI shows it.
   const rawStatus = data.status as string;
   const scheduledCancel =
     (data as unknown as { scheduledChange?: { action?: string } | null })
@@ -503,7 +503,7 @@ async function handleSubscriptionStatus(
     update: { status, paddleUpdatedAt },
   });
 
-  // Status-change webhooks never touch the plan — keep from/to identical so
+  // Status-change webhooks never touch the plan - keep from/to identical so
   // the classifier sees a pure status transition.
   const plan = existing?.plan ?? "free";
   await recordSubscriptionTransition(tx, {

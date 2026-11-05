@@ -42,7 +42,7 @@ registerChannel({
       });
       await throwIfNotOk(res, "SSE server");
     } else {
-      // A standalone worker has no browser connections — publishing to the
+      // A standalone worker has no browser connections - publishing to the
       // local registry would silently go nowhere while being marked delivered.
       if (process.env.MODE === "worker") {
         throw new PermanentChannelError(

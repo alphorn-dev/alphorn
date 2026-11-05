@@ -124,7 +124,7 @@ export async function deleteAccount() {
       }
     }
 
-    // Delete the user — cascades: Sessions, Accounts, TwoFactors,
+    // Delete the user - cascades: Sessions, Accounts, TwoFactors,
     // remaining Members, Invitations, InviteLinks
     await tx.user.delete({ where: { id: userId } });
   });

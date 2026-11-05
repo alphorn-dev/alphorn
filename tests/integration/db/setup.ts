@@ -15,7 +15,7 @@ if (!dbUrl) {
 }
 if (!/(test|integration)/i.test(dbUrl)) {
   throw new Error(
-    `Refusing to run integration tests against ${dbUrl} — database name must contain "test" or "integration". ` +
+    `Refusing to run integration tests against ${dbUrl} - database name must contain "test" or "integration". ` +
       `Point DATABASE_URL at a dedicated test database.`,
   );
 }

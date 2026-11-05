@@ -85,7 +85,7 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
   const [messages, total] = await Promise.all([
     prisma.message.findMany({
       where,
-      // Only the columns the messages table renders — omit the payload JSONB
+      // Only the columns the messages table renders - omit the payload JSONB
       // (up to the 1MB webhook body limit) and other unused Delivery fields.
       select: {
         id: true,
@@ -303,7 +303,7 @@ export async function getDashboardStats() {
     `,
     prisma.message.findMany({
       where: { webhook: { organizationId: orgId } },
-      // Recent-messages card only shows title/webhook/status/time — omit the
+      // Recent-messages card only shows title/webhook/status/time - omit the
       // payload JSONB and unused Delivery fields.
       select: {
         id: true,

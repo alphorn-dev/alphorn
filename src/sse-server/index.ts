@@ -41,7 +41,7 @@ function verifyAuth(authHeader: string | undefined): boolean {
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url!, `http://localhost:${PORT}`);
 
-  // GET /stream/[publicId] — SSE stream for clients
+  // GET /stream/[publicId] - SSE stream for clients
   const streamMatch = url.pathname.match(/^\/stream\/([^/]+)$/);
   if (streamMatch && req.method === "GET") {
     const publicId = streamMatch[1];
@@ -112,7 +112,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return;
   }
 
-  // POST /publish/[channelId] — internal endpoint from Alphorn
+  // POST /publish/[channelId] - internal endpoint from Alphorn
   const publishMatch = url.pathname.match(/^\/publish\/([^/]+)$/);
   if (publishMatch && req.method === "POST") {
     if (!verifyAuth(req.headers.authorization)) {

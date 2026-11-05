@@ -4,7 +4,7 @@ Thanks for your interest in contributing! This document covers the basics.
 
 ## Before you start
 
-- Read [`AGENTS.md`](./AGENTS.md) — it documents the stack, architecture,
+- Read [`AGENTS.md`](./AGENTS.md) - it documents the stack, architecture,
   conventions, and design principles.
 - For non-trivial changes, open an issue first to discuss the approach.
 
@@ -38,8 +38,8 @@ pnpm dev
 
 ## Before submitting a PR
 
-1. `pnpm lint` — must pass.
-2. `pnpm test` — must pass.
+1. `pnpm lint` - must pass.
+2. `pnpm test` - must pass.
 3. New business logic (channels, filters, billing, webhook routing) should
    come with tests. UI and one-off scripts don't require tests.
 4. Keep changes focused. Don't bundle unrelated refactors into a feature PR.
@@ -58,7 +58,7 @@ By submitting a pull request, you agree that:
    under the project's license.
 2. You grant Armin Reiter a perpetual, worldwide, non-exclusive, royalty-free,
    irrevocable license to use, reproduce, modify, distribute, sublicense, and
-   **relicense** your contribution under any license he chooses — including
+   **relicense** your contribution under any license he chooses - including
    AGPL-3.0-or-later, a commercial license, or any future license the project
    adopts.
 3. You retain copyright of your contribution.

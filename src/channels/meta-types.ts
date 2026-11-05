@@ -1,7 +1,7 @@
 import type { ConfigField } from "./types";
 
 /**
- * Client-safe channel metadata. No Node.js dependencies — this is the type
+ * Client-safe channel metadata. No Node.js dependencies - this is the type
  * shared between each channel's `<type>.meta.ts` (imported by both the UI
  * and the server handler) and the aggregating barrel in `meta.ts`.
  */
