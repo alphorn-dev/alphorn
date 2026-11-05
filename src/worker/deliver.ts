@@ -160,6 +160,8 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     priority: delivery.message.priority ?? undefined,
     tags: delivery.message.tags.length > 0 ? delivery.message.tags : undefined,
     payload: (delivery.message.payload as Record<string, unknown>) || undefined,
+    // Only written by the receiver from pickForwardHeaders (string values).
+    headers: (delivery.message.headers as Record<string, string> | null) ?? undefined,
   };
 
   try {

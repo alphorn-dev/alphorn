@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { Forward } from "lucide-react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -91,6 +92,10 @@ function Webhook(props: IconProps) {
       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none" />
     </svg>
   );
+}
+
+function ForwardIcon(props: IconProps) {
+  return <Forward {...props} />;
 }
 
 function Ntfy(props: IconProps) {
@@ -283,6 +288,7 @@ const iconMap: Record<string, React.FC<IconProps>> = {
   matrix: Matrix,
   mattermost: Mattermost,
   webhook: Webhook,
+  forward: ForwardIcon,
   ntfy: Ntfy,
   pushover: Pushover,
   gotify: Gotify,

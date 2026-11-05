@@ -43,7 +43,7 @@ const SENSITIVE_HEADER_EXACT = new Set([
   "proxy-authorization",
 ]);
 
-function filterHeaders(headers: Record<string, string>): Record<string, string> {
+export function filterHeaders(headers: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
     const lower = key.toLowerCase();

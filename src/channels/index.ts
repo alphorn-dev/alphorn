@@ -2,6 +2,7 @@
 import "./telegram";
 import "./discord";
 import "./webhook";
+import "./forward";
 import "./smtp";
 import "./slack";
 import "./teams";

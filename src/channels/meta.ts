@@ -2,6 +2,7 @@ import type { ChannelMeta } from "./meta-types";
 import { meta as telegram } from "./telegram.meta";
 import { meta as discord } from "./discord.meta";
 import { meta as webhook } from "./webhook.meta";
+import { meta as forward } from "./forward.meta";
 import { meta as smtp } from "./smtp.meta";
 import { meta as slack } from "./slack.meta";
 import { meta as teams } from "./teams.meta";
@@ -35,6 +36,7 @@ const channelMeta: ChannelMeta[] = [
   telegram,
   discord,
   webhook,
+  forward,
   smtp,
   slack,
   teams,

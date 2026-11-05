@@ -6,6 +6,7 @@ import type { FilterDefinition } from "@/lib/filter/schema";
 import { logger as rootLogger } from "@/lib/logger";
 import { isSlackPayload, normalizeSlackPayload } from "@/lib/slack-compat";
 import { extractFromPayload, extractFromText } from "@/lib/webhook-extract";
+import { pickForwardHeaders } from "@/lib/forward-headers";
 import { checkMessageQuotaForSubscription } from "@/lib/billing/subscription";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
 import { getCachedWebhook } from "@/lib/webhook-cache";
@@ -171,12 +172,12 @@ export async function POST(
     }
   }
 
-  if (body) {
+  const headers: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
 
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
+  if (body) {
     const extracted = extractFromPayload({
       body,
       headers,
@@ -221,6 +222,7 @@ export async function POST(
     tags,
     payload,
     payloadJson,
+    headers: pickForwardHeaders(headers),
     channelIds: enabledChannels.map((wc) => wc.channelId),
     trace: [...verifiedTrace, webhook.publicId],
   });

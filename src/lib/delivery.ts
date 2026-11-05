@@ -11,6 +11,8 @@ export interface PersistMessageInput {
   // Pre-serialized payload (e.g. the receiver's raw request body) to skip a
   // redundant re-stringify on the hot path. Must be JSON equal to `payload`.
   payloadJson?: string;
+  /** Request headers for the Forward channel, already filtered by pickForwardHeaders. */
+  headers?: Record<string, string>;
   channelIds: string[];
   trace?: string[];
 }
@@ -25,6 +27,7 @@ export async function persistMessageAndEnqueueDeliveries(
   const queuePromise = channelIds.length > 0 ? getQueue() : null;
 
   const payloadJson = input.payloadJson ?? JSON.stringify(payload ?? {});
+  const headersJson = input.headers ? JSON.stringify(input.headers) : null;
 
   // One round-trip: insert the Message and all Deliveries via a CTE, and
   // return both the message id and the freshly-minted delivery ids. This
@@ -35,10 +38,10 @@ export async function persistMessageAndEnqueueDeliveries(
   >`
     WITH m AS (
       INSERT INTO "Message"
-        ("webhookId", "title", "message", "priority", "tags", "payload")
+        ("webhookId", "title", "message", "priority", "tags", "payload", "headers")
       VALUES
         (${webhookId}, ${title}, ${message}, ${priority}::int,
-         ${tags}::text[], ${payloadJson}::jsonb)
+         ${tags}::text[], ${payloadJson}::jsonb, ${headersJson}::jsonb)
       RETURNING "id"
     ),
     d AS (

@@ -6,6 +6,8 @@ export interface Notification {
   priority?: number;
   tags?: string[];
   payload?: Record<string, unknown>;
+  /** Original request headers, filtered on receive (see lib/forward-headers.ts). */
+  headers?: Record<string, string>;
 }
 
 export interface ConfigField {

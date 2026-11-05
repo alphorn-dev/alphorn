@@ -324,6 +324,7 @@ describe("POST /n/:publicId — webhook receiver", () => {
       payload: bodyObj,
       // Raw request text is reused verbatim for the jsonb insert (no re-serialize).
       payloadJson: JSON.stringify(bodyObj),
+      headers: { "content-type": "application/json" },
       channelIds: ["ch_enabled"],
       trace: ["public_1"],
     });
@@ -430,6 +431,7 @@ describe("POST /n/:publicId — webhook receiver", () => {
       tags: ["ops"],
       payload: bodyObj,
       payloadJson: JSON.stringify(bodyObj),
+      headers: { "content-type": "application/json" },
       channelIds: [],
       trace: ["public_1"],
     });
@@ -462,6 +464,12 @@ describe("POST /n/:publicId — webhook receiver", () => {
       priority: null,
       tags: ["ops", "urgent"],
       payload: null,
+      headers: {
+        "content-type": "text/plain",
+        "x-priority": "not-a-number",
+        "x-tags": "ops,  urgent ,,",
+        "x-title": "Text alert",
+      },
       channelIds: [],
       trace: ["public_1"],
     });

@@ -244,6 +244,9 @@ model Message {
   priority  Int?
   tags      String[]
   payload   Json?
+  // Request headers kept for the Forward channel, minus credentials,
+  // signatures and proxy/infrastructure headers (see lib/forward-headers.ts).
+  headers   Json?
   createdAt DateTime @default(now())
 
   deliveries Delivery[]
