@@ -1,0 +1,41 @@
+# documentation: https://docs.alphorn.dev
+# slogan: Self-hostable notification router. Receive webhooks, route them to 20+ channels.
+# category: monitoring
+# tags: notifications,webhooks,alerts,slack,discord,telegram
+# logo: svgs/alphorn.svg
+# port: 3000
+#
+# Coolify's service catalog is closed to outside contributions for now.
+# Until then: Coolify > New Resource > Docker Compose Empty, paste this file.
+services:
+  alphorn:
+    image: ghcr.io/alphorn-dev/alphorn:1.4.0
+    environment:
+      - SERVICE_URL_ALPHORN_3000
+      - BETTER_AUTH_URL=${SERVICE_URL_ALPHORN_3000}
+      - BETTER_AUTH_SECRET=${SERVICE_REALBASE64_32_AUTH}
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/alphorn
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=alphorn
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/18/docker.
+      - alphorn-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d alphorn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

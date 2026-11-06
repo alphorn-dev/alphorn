@@ -45,6 +45,20 @@ docker compose up -d
 
 Open <http://localhost:3000> and create your first account.
 
+### Prebuilt image
+
+```bash
+docker pull alphorn/alphorn:latest
+```
+
+Published on [Docker Hub](https://hub.docker.com/r/alphorn/alphorn), mirrored to `ghcr.io/alphorn-dev/alphorn` (same tags) as a fallback if you hit Docker Hub pull rate limits. See the [self-hosting guide](https://docs.alphorn.dev/self-hosting) for a ready-to-use compose file.
+
+### One-click deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alphorn-dev/alphorn)
+
+Also available as a [Dokploy](https://dokploy.com) template and as a paste-in [Coolify compose file](./deploy/coolify/alphorn.yaml). See [`deploy/`](./deploy/README.md).
+
 ### Local development
 
 Requirements: Node.js 22.12+, pnpm, PostgreSQL 18.

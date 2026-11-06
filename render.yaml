@@ -1,0 +1,29 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy button: https://render.com/deploy?repo=https://github.com/alphorn-dev/alphorn
+# BETTER_AUTH_URL is derived from RENDER_EXTERNAL_URL by docker-entrypoint.sh.
+# Set it explicitly once you add a custom domain.
+services:
+  - type: web
+    name: alphorn
+    runtime: image
+    image:
+      url: ghcr.io/alphorn-dev/alphorn:1.4.0
+    # Paid plan: the free plan sleeps, which stops the embedded delivery worker.
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alphorn-db
+          property: connectionString
+
+databases:
+  - name: alphorn-db
+    databaseName: alphorn
+    user: alphorn
+    postgresMajorVersion: "18"
+    plan: basic-256mb

@@ -1,6 +1,16 @@
 #!/bin/sh
 set -e
 
+# Fall back to the public URL a PaaS injects, so one-click deploys need no
+# manual BETTER_AUTH_URL. An explicit value (e.g. a custom domain) always wins.
+if [ -z "$BETTER_AUTH_URL" ]; then
+  if [ -n "$RENDER_EXTERNAL_URL" ]; then
+    export BETTER_AUTH_URL="$RENDER_EXTERNAL_URL"
+  elif [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
+    export BETTER_AUTH_URL="https://$RAILWAY_PUBLIC_DOMAIN"
+  fi
+fi
+
 # Run database migrations (isolated Prisma CLI, see Dockerfile)
 (cd /opt/prisma && node node_modules/prisma/build/index.js migrate deploy)
 
