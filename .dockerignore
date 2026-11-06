@@ -26,3 +26,8 @@ tsconfig.tsbuildinfo
 
 # Logs
 *.log
+
+# Local notes and review output
+.local
+.claude
+reviews

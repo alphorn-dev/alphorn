@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { requireSession, requireAdminOrOwner } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
 import { getChannel } from "@/channels";
-import { generateChannelId } from "@/lib/api-key";
+import { generateChannelId, generatePublicId } from "@/lib/api-key";
 import { revalidatePath } from "next/cache";
+import { resourceNameSchema } from "@/lib/schemas";
 import type { Prisma } from "@/generated/prisma/client";
 
 export async function getChannelsForOrg() {
@@ -67,7 +68,7 @@ export async function createChannel(data: {
   const channel = await prisma.channel.create({
     data: {
       id: generateChannelId(),
-      name: data.name,
+      name: resourceNameSchema.parse(data.name),
       type: data.type,
       config: config as Prisma.InputJsonValue,
       organizationId: orgId,
@@ -117,7 +118,7 @@ export async function updateChannel(
   const channel = await prisma.channel.update({
     where: { id },
     data: {
-      name: data.name,
+      name: resourceNameSchema.parse(data.name),
       config: config as Prisma.InputJsonValue,
       enabled: data.enabled,
     },
@@ -189,5 +190,27 @@ export async function getSseConnectionCount(channelId: string): Promise<number> 
   if (!channel) return 0;
 
   const { getConnectionCount } = await import("@/lib/sse/connection-registry");
-  return getConnectionCount(channel.id);
+  return getConnectionCount(channel.publicId);
+}
+
+/**
+ * New stream URL for an SSE channel. The old URL stops working: new connections get 404, open
+ * streams get no further messages (they are keyed by the publicId, see connection-registry).
+ */
+export async function regenerateChannelPublicId(channelId: string): Promise<string> {
+  const { orgId } = await requireAdminOrOwner();
+
+  const existing = await prisma.channel.findFirst({
+    where: { id: channelId, organizationId: orgId, type: "sse", deletedAt: null },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("Channel not found");
+
+  const channel = await prisma.channel.update({
+    where: { id: channelId },
+    data: { publicId: generatePublicId() },
+    select: { publicId: true },
+  });
+  revalidatePath(`/channels/${channelId}/edit`);
+  return channel.publicId;
 }

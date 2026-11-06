@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { showError } from "@/lib/toast-error";
 import { authClient } from "@/lib/auth/client";
 import { generateOrgSlug } from "@/lib/org-slug";
 import { getOrgs2FARequirements } from "@/app/(dashboard)/settings/actions";
@@ -51,7 +52,7 @@ export function OrgSwitcher() {
     async function load() {
       const [orgsResult, activeResult, locked] = await Promise.all([
         authClient.organization.list(),
-        authClient.organization.getFullOrganization(),
+        authClient.organization.getOrganization(),
         getOrgs2FARequirements(),
       ]);
       if (cancelled) return;
@@ -66,7 +67,7 @@ export function OrgSwitcher() {
   async function refreshOrgs() {
     const [orgsResult, activeResult, locked] = await Promise.all([
       authClient.organization.list(),
-      authClient.organization.getFullOrganization(),
+      authClient.organization.getOrganization(),
       getOrgs2FARequirements(),
     ]);
     if (orgsResult.data) setOrgs(orgsResult.data.map(toOrg));
@@ -77,11 +78,15 @@ export function OrgSwitcher() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
-    await authClient.organization.create({
+    const { error } = await authClient.organization.create({
       name: newOrgName,
       slug: generateOrgSlug(newOrgName),
     });
     setCreating(false);
+    if (error) {
+      showError(error, "Failed to create project");
+      return;
+    }
     setDialogOpen(false);
     setNewOrgName("");
     await refreshOrgs();
@@ -90,7 +95,7 @@ export function OrgSwitcher() {
 
   async function handleSelect(orgId: string) {
     await authClient.organization.setActive({ organizationId: orgId });
-    const { data } = await authClient.organization.getFullOrganization();
+    const { data } = await authClient.organization.getOrganization();
     if (data) setActiveOrg(toOrg(data));
     const detailMatch = pathname?.match(/^\/(webhooks|channels|messages)\/[^/]+/);
     if (detailMatch) {

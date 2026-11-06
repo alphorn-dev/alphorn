@@ -20,6 +20,13 @@ describe("pickForwardHeaders", () => {
       "x-forwarded-for": "203.0.113.1",
       "cf-ray": "abc123",
       "x-alphorn-trace": "t",
+      "api-key": "secret",
+      apikey: "secret",
+      "x-goog-api-key": "secret",
+      "x-functions-key": "secret",
+      "x-webhook-key": "secret",
+      authentication: "secret",
+      "x-signature-hmac-sha256": "abc",
     });
     expect(result).toEqual({
       "content-type": "application/json",

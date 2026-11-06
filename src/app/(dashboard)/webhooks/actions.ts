@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/db";
 import { requireSession, requireOrgSession, requireAdminOrOwner } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
+import { assertWebhookLimit } from "@/lib/webhook-limit";
+import { GITHUB_EVENT_IDS } from "@/lib/github/events";
 import {
   generateApiKey,
   generatePublicId,
@@ -14,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import { FilterDefinition as FilterDefinitionSchema } from "@/lib/filter/schema";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { z } from "zod";
+import { descriptionSchema, resourceNameSchema } from "@/lib/schemas";
 import { EXTRACT_MODES, type ExtractMode } from "@/lib/webhook-extract/mode";
 
 const templateStringSchema = z
@@ -30,14 +33,18 @@ const webhookTemplatesSchema = z.object({
   priorityTemplate: templateStringSchema,
 });
 
-function validateFilters(channelFilters?: Record<string, FilterDefinition | null>) {
-  if (!channelFilters) return;
-  for (const filter of Object.values(channelFilters)) {
-    if (filter !== null) {
-      FilterDefinitionSchema.parse(filter);
-    }
+// Returns the parsed filters: stored as parsed, so unknown keys never reach the DB.
+function validateFilters(
+  channelFilters?: Record<string, FilterDefinition | null>,
+): Record<string, FilterDefinition | null> {
+  const parsed: Record<string, FilterDefinition | null> = {};
+  for (const [channelId, filter] of Object.entries(channelFilters ?? {})) {
+    parsed[channelId] = filter === null ? null : FilterDefinitionSchema.parse(filter);
   }
+  return parsed;
 }
+
+const webhookMetaSchema = z.object({ name: resourceNameSchema, description: descriptionSchema });
 
 async function loadLinkEnabledMap(webhookId: string) {
   const links = await prisma.webhookChannel.findMany({
@@ -112,6 +119,9 @@ export async function getWebhookById(id: string) {
           channel: { select: { id: true, name: true, type: true } },
         },
       },
+      githubInstallation: {
+        select: { installationId: true, events: true, suspendedAt: true },
+      },
     },
   });
 }
@@ -130,19 +140,10 @@ export async function createWebhook(data: {
 }) {
   const { orgId } = await requireAdminOrOwner();
 
-  const limits = await getOrgLimits(orgId);
-  if (limits?.webhooks !== null && limits?.webhooks !== undefined) {
-    const currentCount = await prisma.webhook.count({
-      where: { organizationId: orgId, deletedAt: null },
-    });
-    if (currentCount >= limits.webhooks) {
-      throw new Error(
-        `Webhook limit reached (${limits.webhooks}). Upgrade your plan for more.`,
-      );
-    }
-  }
+  await assertWebhookLimit(orgId);
 
-  validateFilters(data.channelFilters);
+  const meta = webhookMetaSchema.parse({ name: data.name, description: data.description });
+  const filters = validateFilters(data.channelFilters);
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const templates = webhookTemplatesSchema.parse({
@@ -157,8 +158,8 @@ export async function createWebhook(data: {
   const webhook = await prisma.webhook.create({
     data: {
       id: generateWebhookId(),
-      name: data.name,
-      description: data.description || null,
+      name: meta.name,
+      description: meta.description || null,
       apiKeyHash: hashApiKey(apiKey),
       apiKeyPrefix: apiKeyPrefix(apiKey),
       publicId: generatePublicId(),
@@ -172,7 +173,7 @@ export async function createWebhook(data: {
       channels: {
         create: data.channelIds.map((channelId) => ({
           channelId,
-          filter: data.channelFilters?.[channelId] ?? undefined,
+          filter: filters[channelId] ?? undefined,
         })),
       },
     },
@@ -223,7 +224,8 @@ export async function updateWebhook(
     }
   }
 
-  validateFilters(data.channelFilters);
+  const meta = webhookMetaSchema.parse({ name: data.name, description: data.description });
+  const filters = validateFilters(data.channelFilters);
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const templates = webhookTemplatesSchema.parse({
@@ -243,8 +245,8 @@ export async function updateWebhook(
     prisma.webhook.update({
       where: { id },
       data: {
-        name: data.name,
-        description: data.description || null,
+        name: meta.name,
+        description: meta.description || null,
         enabled: data.enabled,
         requireAuth: data.requireAuth,
         extractMode: templates.extractMode,
@@ -255,7 +257,7 @@ export async function updateWebhook(
         channels: {
           create: data.channelIds.map((channelId) => ({
             channelId,
-            filter: data.channelFilters?.[channelId] ?? undefined,
+            filter: filters[channelId] ?? undefined,
             enabled: enabledByChannel.get(channelId) ?? true,
           })),
         },
@@ -276,10 +278,15 @@ export async function deleteWebhook(id: string) {
 
   // Soft-delete: tombstone the row so Messages/Deliveries retain history.
   // The Webhook UPDATE trigger flushes the receiver cache (/n/:publicId -> 404).
-  await prisma.webhook.update({
-    where: { id },
-    data: { deletedAt: new Date(), enabled: false },
-  });
+  // A GitHub connection is unlinked too, so the installation can be
+  // connected again (its installationId is unique).
+  await prisma.$transaction([
+    prisma.githubInstallation.deleteMany({ where: { webhookId: id } }),
+    prisma.webhook.update({
+      where: { id },
+      data: { deletedAt: new Date(), enabled: false },
+    }),
+  ]);
   revalidatePath("/webhooks");
 }
 
@@ -332,7 +339,7 @@ export async function updateWebhookChannels(
   });
   if (!existing) throw new Error("Webhook not found");
 
-  validateFilters(data.channelFilters);
+  const filters = validateFilters(data.channelFilters);
   await assertChannelsBelongToOrg(data.channelIds, orgId);
 
   const enabledByChannel = await loadLinkEnabledMap(webhookId);
@@ -344,7 +351,7 @@ export async function updateWebhookChannels(
         data: {
           webhookId,
           channelId,
-          filter: data.channelFilters?.[channelId] ?? undefined,
+          filter: filters[channelId] ?? undefined,
           enabled: enabledByChannel.get(channelId) ?? true,
         },
       })
@@ -389,4 +396,17 @@ export async function regeneratePublicId(id: string) {
 
   revalidatePath("/webhooks");
   return webhook.publicId;
+}
+
+export async function updateGithubEvents(webhookId: string, events: string[]) {
+  const { orgId } = await requireAdminOrOwner();
+  const parsed = z.array(z.enum(GITHUB_EVENT_IDS)).max(GITHUB_EVENT_IDS.length).parse(events);
+
+  const { count } = await prisma.githubInstallation.updateMany({
+    where: { webhookId, organizationId: orgId },
+    data: { events: Array.from(new Set(parsed)) },
+  });
+  if (count === 0) throw new Error("GitHub connection not found");
+
+  revalidatePath(`/webhooks/${webhookId}`);
 }

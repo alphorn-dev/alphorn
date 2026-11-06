@@ -11,11 +11,13 @@ export function ProfileTabs({
   orgsRequiring2FACount,
   mailerConfigured,
   userHasPassword,
+  userHasTotp,
   passkeys,
 }: {
   orgsRequiring2FACount: number;
   mailerConfigured: boolean;
   userHasPassword: boolean;
+  userHasTotp: boolean;
   passkeys: PasskeyRow[];
 }) {
   return (
@@ -55,7 +57,11 @@ export function ProfileTabs({
         </TabsContent>
 
         <TabsContent value="danger" className="mt-6">
-          <DeleteAccountCard />
+          <DeleteAccountCard
+            hasPassword={userHasPassword}
+            hasTotp={userHasTotp}
+            hasPasskey={passkeys.length > 0}
+          />
         </TabsContent>
       </Tabs>
     </div>

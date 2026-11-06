@@ -62,6 +62,11 @@ registerChannel({
       connectionTimeout: 15_000,
       greetingTimeout: 15_000,
       socketTimeout: 30_000,
+      // nodemailer opens raw sockets, which the global undici dispatcher
+      // (src/lib/http/egress.ts) doesn't see. Tunnel them through the same
+      // egress proxy via HTTP CONNECT, so a user-supplied host can't reach
+      // internal addresses.
+      ...(process.env.EGRESS_PROXY_URL && { proxy: process.env.EGRESS_PROXY_URL }),
       auth: {
         user: config.username,
         pass: config.password,

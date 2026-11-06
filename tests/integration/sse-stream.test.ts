@@ -112,7 +112,7 @@ describe("GET /api/stream/:publicId - SSE streaming", () => {
     controller.abort();
     await vi.runAllTimersAsync();
 
-    expect(mocks.removeConnection).toHaveBeenCalledWith("channel-123", writer);
+    expect(mocks.removeConnection).toHaveBeenCalledWith("live", writer);
   });
 
   it("returns 429 when the connection registry rejects due to limits", async () => {
@@ -133,7 +133,7 @@ describe("GET /api/stream/:publicId - SSE streaming", () => {
 
     expect(res.status).toBe(429);
     expect(mocks.addConnection).toHaveBeenCalledWith(
-      "ch_full",
+      "full",
       expect.anything(),
       "203.0.113.5",
     );
@@ -172,7 +172,7 @@ describe("GET /api/stream/:publicId - SSE streaming", () => {
     const writer = mocks.addConnection.mock.calls.at(-1)![1];
     await vi.advanceTimersByTimeAsync(30_000);
 
-    expect(mocks.removeConnection).toHaveBeenCalledWith("channel-456", writer);
+    expect(mocks.removeConnection).toHaveBeenCalledWith("live", writer);
     expect(close).toHaveBeenCalled();
 
     vi.unstubAllGlobals();

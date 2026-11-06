@@ -3,7 +3,7 @@ import { registerChannel } from "./registry";
 import { fetchWithTimeout } from "./fetch";
 import { throwIfNotOk, PermanentChannelError } from "./errors";
 import { SAME_HOST_ERROR, isSameHostAsApp, refineNotAppHost } from "./utils";
-import { traceHeaders } from "@/lib/webhook-loop/hops";
+import { TRACE_HEADER, traceHeaders } from "@/lib/webhook-loop/hops";
 import { meta } from "./webhook.meta";
 
 const configSchema = z.object({
@@ -14,7 +14,12 @@ const configSchema = z.object({
   // being retried as a transient send error.
   headers: z
     .record(
-      z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, "Invalid header name"),
+      z
+        .string()
+        .regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, "Invalid header name")
+        // Header names are case-insensitive: "X-Alphorn-Trace" would be sent
+        // next to the real trace header and break loop detection.
+        .refine((name) => name.toLowerCase() !== TRACE_HEADER, "This header is set by Alphorn"),
       z.string().regex(/^[\t\x20-\x7e\x80-\xff]*$/, "Invalid header value"),
     )
     .default({}),

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { WebhookCredentials } from "./webhook-credentials";
 import { WebhookExamples } from "./webhook-examples";
 import { WebhookChannels } from "./webhook-channels";
+import { WebhookGithub } from "./webhook-github";
+import { githubAppConfig, installUrl } from "@/lib/github/app";
 import { ArrowLeft } from "lucide-react";
 
 export default async function WebhookDetailPage({
@@ -23,6 +25,10 @@ export default async function WebhookDetailPage({
     redirect("/webhooks");
   }
   const isAdminOrOwner = role === "owner" || role === "admin";
+  // GitHub-connected webhooks receive events via /api/github/webhook, so the
+  // /n/ endpoint, API key and curl examples don't apply to them.
+  const github = webhook.githubInstallation;
+  const githubConfig = githubAppConfig();
 
   const endpointUrl = `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/n/${webhook.publicId}`;
 
@@ -52,12 +58,22 @@ export default async function WebhookDetailPage({
       </div>
 
       <div className="mt-6 space-y-6">
-        <WebhookCredentials
-          webhookId={webhook.id}
-          apiKeyPrefix={webhook.apiKeyPrefix}
-          endpointUrl={endpointUrl}
-          requireAuth={webhook.requireAuth}
-        />
+        {github ? (
+          <WebhookGithub
+            webhookId={webhook.id}
+            manageUrl={githubConfig ? installUrl(githubConfig) : "https://github.com/settings/installations"}
+            events={github.events}
+            suspended={github.suspendedAt !== null}
+            isAdminOrOwner={isAdminOrOwner}
+          />
+        ) : (
+          <WebhookCredentials
+            webhookId={webhook.id}
+            apiKeyPrefix={webhook.apiKeyPrefix}
+            endpointUrl={endpointUrl}
+            requireAuth={webhook.requireAuth}
+          />
+        )}
 
         <WebhookChannels
           webhookId={webhook.id}
@@ -65,10 +81,12 @@ export default async function WebhookDetailPage({
           isAdminOrOwner={isAdminOrOwner}
         />
 
-        <WebhookExamples
-          endpointUrl={endpointUrl}
-          requireAuth={webhook.requireAuth}
-        />
+        {!github && (
+          <WebhookExamples
+            endpointUrl={endpointUrl}
+            requireAuth={webhook.requireAuth}
+          />
+        )}
       </div>
     </div>
   );

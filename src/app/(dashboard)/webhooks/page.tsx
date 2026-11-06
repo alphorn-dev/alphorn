@@ -19,8 +19,27 @@ import {
 } from "@/components/ui/tooltip";
 import { SquarePen } from "lucide-react";
 import { formatDate } from "@/lib/format-date";
+import { githubAppConfig, installUrl } from "@/lib/github/app";
 
-export default async function WebhooksPage() {
+const GITHUB_ERRORS: Record<string, string> = {
+  permission: "Only project owners and admins can connect GitHub.",
+  state: "The GitHub connection expired or was started from another project. Please try again.",
+  oauth: "GitHub did not authorize Alphorn. Please try again.",
+  access: "Your GitHub account doesn't own that installation.",
+  "org-admin": "Only owners of the GitHub organization can connect its installation.",
+  limit: "Webhook limit reached. Upgrade your plan or delete a webhook to connect GitHub.",
+  linked: "This GitHub installation is already connected to another project.",
+  install: "Missing or invalid GitHub installation. Start again with Connect GitHub.",
+};
+
+export default async function WebhooksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ github_error?: string }>;
+}) {
+  const { github_error } = await searchParams;
+  const githubError = github_error ? GITHUB_ERRORS[github_error] : undefined;
+  const githubConfig = githubAppConfig();
   const session = await requireSession();
   const orgId = session.session.activeOrganizationId;
   const [webhooks, role, limits] = await Promise.all([
@@ -42,6 +61,12 @@ export default async function WebhooksPage() {
             Manage your inbound webhooks.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        {isAdminOrOwner && githubConfig && !limitReached && (
+          <a href={installUrl(githubConfig)}>
+            <Button variant="outline">Connect GitHub</Button>
+          </a>
+        )}
         {isAdminOrOwner &&
           (limitReached ? (
             <Tooltip>
@@ -58,7 +83,14 @@ export default async function WebhooksPage() {
               <Button>Create webhook</Button>
             </Link>
           ))}
+        </div>
       </div>
+
+      {githubError && (
+        <p role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {githubError}
+        </p>
+      )}
 
       {webhooks.length === 0 ? (
         <div className="mt-8 text-center">

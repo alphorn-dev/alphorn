@@ -17,6 +17,10 @@ registerChannel({
   ...meta,
   configSchema,
   async send(config, notification, context) {
+    // Streams are registered under the stream URL's publicId: after it is
+    // rotated, streams opened with the old URL get nothing anymore.
+    const streamKey = context.channelPublicId;
+    if (!streamKey) throw new PermanentChannelError("SSE delivery without the channel's publicId");
     const sseConfig: SseConfig = {
       format: config.format,
       includePriority: config.includePriority,
@@ -31,7 +35,7 @@ registerChannel({
         );
       }
       // Standalone mode: POST to external SSE server
-      const url = `${process.env.SSE_SERVER_URL}/publish/${context.channelId}`;
+      const url = `${process.env.SSE_SERVER_URL}/publish/${encodeURIComponent(streamKey)}`;
       const res = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
@@ -51,7 +55,7 @@ registerChannel({
       }
       // Embedded mode: write directly to connected clients
       const event = formatSseEvent(notification, sseConfig);
-      publish(context.channelId, event);
+      publish(streamKey, event);
     }
   },
   // No test: a live stream only means something to a client already

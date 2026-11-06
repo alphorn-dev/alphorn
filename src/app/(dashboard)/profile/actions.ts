@@ -3,8 +3,9 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { requireSession } from "@/lib/auth/server";
-import { grantPasskeyReauth } from "@/lib/auth/second-factor-hooks";
+import { currentUserHasPassword, requireSession } from "@/lib/auth/server";
+import { factorState, grantPasskeyReauth } from "@/lib/auth/second-factor-hooks";
+import { hasSecondFactor, REAUTH_MS } from "@/lib/auth/second-factor";
 import { APIError } from "better-auth/api";
 import { hasLiveSubscription } from "@/lib/billing/subscription";
 import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
@@ -78,9 +79,46 @@ export async function confirmPasswordForPasskey(password: string): Promise<Confi
   return { ok: true };
 }
 
-export async function deleteAccount() {
+export type DeleteAccountResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid_password" | "second_factor_required" }
+  | { ok: false; reason: "rate_limited"; retryAfterSec: number };
+
+/**
+ * Deleting the account needs a fresh proof, so a hijacked session can't do it: the password
+ * (users who have one) and a second factor proven in the last REAUTH_MS (users who have one).
+ * The client proves the factor first via verify-totp or a passkey sign-in, which stamp
+ * secondFactorAt on the session. SSO-only users without a factor need nothing extra.
+ */
+export async function deleteAccount(password?: string): Promise<DeleteAccountResult> {
   const session = await requireSession();
   const userId = session.user.id;
+
+  try {
+    await enforceRateLimit(`app:deleteAccount:${userId}`, 5, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return { ok: false, reason: "rate_limited", retryAfterSec: Math.ceil(err.retryAfterMs / 1000) };
+    }
+    throw err;
+  }
+
+  if (await currentUserHasPassword()) {
+    try {
+      await auth.api.verifyPassword({ headers: await headers(), body: { password: String(password ?? "") } });
+    } catch (err) {
+      if (err instanceof APIError) return { ok: false, reason: "invalid_password" };
+      throw err;
+    }
+  }
+
+  const proven = session.session.secondFactorAt;
+  if (
+    hasSecondFactor(await factorState(userId)) &&
+    !(proven && Date.now() - new Date(proven).getTime() <= REAUTH_MS)
+  ) {
+    return { ok: false, reason: "second_factor_required" };
+  }
 
   // Deleting the user cascades its Member rows, so a shared project where it
   // is the only owner would be left ownerless.
@@ -159,4 +197,5 @@ export async function deleteAccount() {
     // remaining Members, Invitations, InviteLinks
     await tx.user.delete({ where: { id: userId } });
   });
+  return { ok: true };
 }

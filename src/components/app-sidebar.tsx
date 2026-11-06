@@ -58,10 +58,9 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (!session?.user?.id) return;
-    authClient.organization.getFullOrganization().then(({ data }) => {
-      if (!data) return;
-      const me = data.members.find((m: { userId: string }) => m.userId === session.user.id);
-      setMemberRole(me?.role ?? null);
+    // Own role only: the full member list is admin-only (src/lib/auth/index.ts).
+    authClient.organization.getActiveMemberRole().then(({ data }) => {
+      setMemberRole(data?.role ?? null);
     });
   }, [session?.user?.id, activeOrganizationId]);
 

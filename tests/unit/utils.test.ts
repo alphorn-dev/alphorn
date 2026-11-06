@@ -26,6 +26,13 @@ describe("sanitizeRedirect", () => {
     expect(sanitizeRedirect("//evil.com")).toBe("/");
   });
 
+  it("rejects control characters URL parsing would strip", () => {
+    for (const v of ["/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "/%09/evil.com".replace("%09", "\t")]) {
+      expect(sanitizeRedirect(v)).toBe("/");
+      expect(new URL(sanitizeRedirect(v), "https://app.test").origin).toBe("https://app.test");
+    }
+  });
+
   it("rejects backslash variants", () => {
     expect(sanitizeRedirect("/\\evil.com")).toBe("/");
   });

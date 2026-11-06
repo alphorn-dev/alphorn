@@ -78,8 +78,10 @@ export async function getMetrics(days: number = 30): Promise<MetricsData> {
     };
   }
 
+  // Bounded: the range drives several aggregate queries.
+  const range = Math.min(Math.max(Math.trunc(Number(days)) || 30, 1), 365);
   const since = new Date();
-  since.setDate(since.getDate() - days);
+  since.setDate(since.getDate() - range);
 
   const [
     totalMessages,

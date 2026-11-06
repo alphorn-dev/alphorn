@@ -8,6 +8,7 @@ import {
   publish,
 } from "../lib/sse/connection-registry";
 import { formatSseComment, formatSseEvent } from "../lib/sse/format";
+import { clientIp } from "../lib/http/client-ip";
 import type { Notification } from "../channels/types";
 import type { SseConfig } from "../lib/sse/format";
 
@@ -26,8 +27,9 @@ const INTERNAL_SECRET = process.env.SSE_INTERNAL_SECRET;
 const KEEPALIVE_INTERVAL_MS = 30_000;
 const MAX_BODY_BYTES = 1024 * 1024; // 1MB
 
-if (!INTERNAL_SECRET) {
-  logger.fatal("SSE_INTERNAL_SECRET is required in standalone mode");
+// The .env.example placeholder is public, so it is as good as no secret.
+if (!INTERNAL_SECRET || INTERNAL_SECRET === "change-me-to-a-random-string") {
+  logger.fatal("SSE_INTERNAL_SECRET is required in standalone mode (and must not be the .env.example placeholder)");
   process.exit(1);
 }
 
@@ -66,18 +68,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     };
 
     const forwarded = req.headers["x-forwarded-for"];
-    const forwardedFirst = Array.isArray(forwarded)
-      ? forwarded[0]
-      : forwarded?.split(",")[0]?.trim();
     const realIp = req.headers["x-real-ip"];
-    const realIpFirst = Array.isArray(realIp) ? realIp[0] : realIp;
-    const ip =
-      forwardedFirst ||
-      realIpFirst ||
-      req.socket.remoteAddress ||
-      "unknown";
+    const ip = clientIp(
+      Array.isArray(forwarded) ? forwarded.join(",") : forwarded,
+      Array.isArray(realIp) ? realIp[0] : realIp,
+      req.socket.remoteAddress,
+    );
 
-    const result = addConnection(channel.id, sseWriter, ip);
+    const result = addConnection(publicId, sseWriter, ip);
     if (!result.ok) {
       res.writeHead(429);
       res.end("Too many connections");
@@ -90,7 +88,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       Connection: "keep-alive",
     });
 
-    logger.info({ channelId: channel.id, publicId }, "SSE client connected");
+    logger.info({ channelId: channel.id }, "SSE client connected");
     sseWriter.write(formatSseComment("connected"));
 
     const keepalive = setInterval(() => {
@@ -98,21 +96,21 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         sseWriter.write(formatSseComment("keepalive"));
       } catch {
         clearInterval(keepalive);
-        removeConnection(channel.id, sseWriter);
+        removeConnection(publicId, sseWriter);
         sseWriter.close();
       }
     }, KEEPALIVE_INTERVAL_MS);
 
     req.on("close", () => {
       clearInterval(keepalive);
-      removeConnection(channel.id, sseWriter);
-      logger.info({ channelId: channel.id, publicId }, "SSE client disconnected");
+      removeConnection(publicId, sseWriter);
+      logger.info({ channelId: channel.id }, "SSE client disconnected");
     });
 
     return;
   }
 
-  // POST /publish/[channelId] - internal endpoint from Alphorn
+  // POST /publish/[publicId] - internal endpoint from Alphorn
   const publishMatch = url.pathname.match(/^\/publish\/([^/]+)$/);
   if (publishMatch && req.method === "POST") {
     if (!verifyAuth(req.headers.authorization)) {
@@ -121,7 +119,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       return;
     }
 
-    const channelId = publishMatch[1];
+    const streamKey = decodeURIComponent(publishMatch[1]);
     let body = "";
     for await (const chunk of req) {
       body += chunk;
@@ -142,8 +140,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     const event = formatSseEvent(payload.notification, payload.config);
-    const sent = publish(channelId, event);
-    logger.info({ channelId, clientsSent: sent }, "SSE event published");
+    const sent = publish(streamKey, event);
+    logger.info({ clientsSent: sent }, "SSE event published");
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ sent }));

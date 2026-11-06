@@ -5,18 +5,14 @@ import {
   removeConnection,
 } from "@/lib/sse/connection-registry";
 import { formatSseComment } from "@/lib/sse/format";
+import { clientIp } from "@/lib/http/client-ip";
 
 export const dynamic = "force-dynamic";
 
 const KEEPALIVE_INTERVAL_MS = 30_000;
 
 function resolveClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return clientIp(req.headers.get("x-forwarded-for"), req.headers.get("x-real-ip"));
 }
 
 export async function GET(
@@ -52,7 +48,7 @@ export async function GET(
   // asynchronously or after `keepalive` below is assigned.
   const cleanup = () => {
     clearInterval(keepalive);
-    removeConnection(channel.id, sseWriter);
+    removeConnection(publicId, sseWriter);
     sseWriter.close();
   };
 
@@ -72,7 +68,7 @@ export async function GET(
   };
 
   const ip = resolveClientIp(req);
-  const result = addConnection(channel.id, sseWriter, ip);
+  const result = addConnection(publicId, sseWriter, ip);
   if (!result.ok) {
     sseWriter.close();
     return new Response("Too many connections", { status: 429 });

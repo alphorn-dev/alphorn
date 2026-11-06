@@ -40,11 +40,12 @@ export const FilterCondition = z.discriminatedUnion("field", [
 ]);
 
 export const FilterGroup = z.object({
-  conditions: z.array(FilterCondition).min(1),
+  // Bounded: every incoming message is evaluated against every filter.
+  conditions: z.array(FilterCondition).min(1).max(20),
 });
 
 export const FilterDefinition = z.object({
-  groups: z.array(FilterGroup).min(1),
+  groups: z.array(FilterGroup).min(1).max(20),
 });
 
 export type FilterCondition = z.infer<typeof FilterCondition>;

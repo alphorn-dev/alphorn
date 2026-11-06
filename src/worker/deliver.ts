@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getQueue, DELIVERY_QUEUE } from "@/lib/queue";
 import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
 import { getChannel } from "@/channels";
-import { isPermanentChannelError, PermanentChannelError } from "@/channels/errors";
+import { errorLogFields, isPermanentChannelError, PermanentChannelError } from "@/channels/errors";
 import { notifyFailure } from "./failure-notifier";
 import type { Notification } from "@/channels/types";
 import { logger as rootLogger } from "@/lib/logger";
@@ -183,6 +183,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     }
     await handler.send(config, notification, {
       channelId: delivery.channelId,
+      channelPublicId: delivery.channel.publicId,
       deliveryId: delivery.id,
       trace: data.trace,
     });
@@ -215,16 +216,16 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     });
 
     if (permanent) {
-      jobLogger.error({ error: errorMessage, err, attempts: updated.attempts }, "Delivery permanently failed (non-retryable)");
+      jobLogger.error({ ...errorLogFields(err), attempts: updated.attempts }, "Delivery permanently failed (non-retryable)");
       await notifyFailure({ ...delivery, ...updated });
       return;
     }
 
     if (updated.attempts >= MAX_RETRIES) {
-      jobLogger.error({ error: errorMessage, err, attempts: updated.attempts, maxRetries: MAX_RETRIES }, "Delivery permanently failed");
+      jobLogger.error({ ...errorLogFields(err), attempts: updated.attempts, maxRetries: MAX_RETRIES }, "Delivery permanently failed");
       await notifyFailure({ ...delivery, ...updated });
     } else {
-      jobLogger.warn({ error: errorMessage, attempts: updated.attempts }, "Delivery failed, will retry");
+      jobLogger.warn({ ...errorLogFields(err), attempts: updated.attempts }, "Delivery failed, will retry");
       throw err;
     }
   }

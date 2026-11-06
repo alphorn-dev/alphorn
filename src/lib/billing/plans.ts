@@ -1,5 +1,8 @@
 export type PlanId = "free" | "pro" | "business" | "enterprise";
 
+/** Projects a user may own on the free plan (hosted only); paid projects don't count. */
+export const FREE_PROJECT_LIMIT = 3;
+
 interface PlanLimits {
   messages: number;
   webhooks: number | null; // null = unlimited

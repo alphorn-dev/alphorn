@@ -1,12 +1,8 @@
 #!/bin/sh
 set -e
 
-# Run database migrations
-# Set NODE_PATH to resolve all pnpm store dependencies for prisma CLI
-export NODE_PATH=$(echo node_modules/.pnpm/*/node_modules | tr ' ' ':')
-PRISMA_CLI="node $(cat .prisma-cli-path)"
-$PRISMA_CLI migrate deploy
-unset NODE_PATH
+# Run database migrations (isolated Prisma CLI, see Dockerfile)
+(cd /opt/prisma && node node_modules/prisma/build/index.js migrate deploy)
 
 # Start based on MODE
 case "${MODE:-all}" in

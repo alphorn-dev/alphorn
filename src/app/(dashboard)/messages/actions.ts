@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DeliveryStatus } from "@/generated/prisma/client";
 import { requireSession, requireOrgSession, requireAdminOrOwner } from "@/lib/auth/server";
@@ -210,6 +211,13 @@ export async function getWebhooksForSend() {
   });
 }
 
+const testMessageSchema = z.object({
+  title: z.string().max(200),
+  messageText: z.string().min(1, "Message is required").max(4000),
+  priority: z.number().int().min(1).max(5).nullish(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+});
+
 export async function sendTestMessage(
   webhookId: string,
   title: string,
@@ -218,6 +226,8 @@ export async function sendTestMessage(
   tags?: string[],
 ) {
   const { orgId } = await requireAdminOrOwner();
+  // Same caps as messages received on a webhook (src/lib/webhook-extract).
+  ({ title, messageText, priority, tags } = testMessageSchema.parse({ title, messageText, priority, tags }));
 
   const webhook = await prisma.webhook.findFirst({
     where: { id: webhookId, organizationId: orgId, enabled: true, deletedAt: null },

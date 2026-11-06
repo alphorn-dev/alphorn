@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/db";
 import { sessionSatisfies2FA } from "@/lib/auth/two-factor-policy";
 
@@ -27,8 +27,12 @@ async function createUser(opts: { passkey?: boolean; totp?: boolean; sso?: boole
   return id;
 }
 
-const check = (id: string, secondFactorAt: Date | null, ssoSignInAt: Date | null = null) =>
-  sessionSatisfies2FA({ user: { id }, session: { secondFactorAt, ssoSignInAt } });
+const check = (
+  id: string,
+  secondFactorAt: Date | null,
+  ssoSignInAt: Date | null = null,
+  ssoProviderId: string | null = null,
+) => sessionSatisfies2FA({ user: { id }, session: { secondFactorAt, ssoSignInAt, ssoProviderId } });
 
 describe("sessionSatisfies2FA", () => {
   it("needs a factor proven by this session", async () => {
@@ -46,8 +50,29 @@ describe("sessionSatisfies2FA", () => {
     expect(await check(id, new Date())).toBe(false);
   });
 
-  it("trusts sessions created by an SSO sign-in", async () => {
-    expect(await check(await createUser({ sso: true }), null, new Date())).toBe(true);
+  it("trusts sessions created by a sign-in through the configured OIDC IdP", async () => {
+    vi.stubEnv("OIDC_CLIENT_ID", "oidc-client");
+    vi.stubEnv("OIDC_PROVIDER_ID", "keycloak");
+    try {
+      expect(await check(await createUser({ sso: true }), null, new Date(), "keycloak")).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("does not trust social sign-ins (GitHub, Google, Microsoft)", async () => {
+    vi.stubEnv("OIDC_CLIENT_ID", "oidc-client");
+    try {
+      for (const provider of ["github", "google", "microsoft", null]) {
+        expect(await check(await createUser({ sso: true }), null, new Date(), provider)).toBe(false);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("does not trust an OIDC-named session when no OIDC IdP is configured", async () => {
+    expect(await check(await createUser({ sso: true }), null, new Date(), "custom-oidc")).toBe(false);
   });
 
   it("does not trust a password session just because the user has linked SSO", async () => {

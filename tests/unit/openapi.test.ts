@@ -8,15 +8,15 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(__dirname, "../..");
 const spec = JSON.parse(readFileSync(path.join(root, "public/openapi.json"), "utf8"));
 
-function routeStatuses(file: string): string[] {
-  const source = readFileSync(path.join(root, file), "utf8");
+function routeStatuses(files: readonly string[]): string[] {
+  const source = files.map((f) => readFileSync(path.join(root, f), "utf8")).join("\n");
   return [...source.matchAll(/status:\s*(\d{3})/g)].map((m) => m[1]);
 }
 
 const routes = [
-  // [spec path, method, route file, implicit success status without an explicit `status:`]
-  ["/n/{publicId}", "post", "src/app/n/[publicId]/route.ts", null],
-  ["/api/stream/{publicId}", "get", "src/app/api/stream/[publicId]/route.ts", "200"],
+  // [spec path, method, route file(s), implicit success status without an explicit `status:`]
+  ["/n/{publicId}", "post", ["src/app/n/[publicId]/route.ts", "src/lib/ingest.ts"], null],
+  ["/api/stream/{publicId}", "get", ["src/app/api/stream/[publicId]/route.ts"], "200"],
 ] as const;
 
 describe("public/openapi.json", () => {

@@ -46,6 +46,7 @@ model Session {
   activeOrganizationId String?
   secondFactorAt       DateTime?
   ssoSignInAt          DateTime?
+  ssoProviderId        String?
 
   @@index([userId])
 }
@@ -130,6 +131,7 @@ model Organization {
   inviteLinks InviteLink[]
   webhooks    Webhook[]
   channels    Channel[]
+  githubInstallations GithubInstallation[]
   settings    OrganizationSettings?
   subscription Subscription?
 }
@@ -222,6 +224,26 @@ model Webhook {
 
   channels WebhookChannel[]
   messages Message[]
+  githubInstallation GithubInstallation?
+
+  @@index([organizationId])
+}
+
+// Links a GitHub App installation to the Webhook it feeds. Events arrive at
+// /api/github/webhook and are routed by installationId; the unique constraint
+// guarantees one installation belongs to exactly one project.
+model GithubInstallation {
+  id             String       @id
+  installationId BigInt       @unique
+  // GitHub event names (X-GitHub-Event) to deliver; others are dropped before
+  // they count against the message quota.
+  events         String[]
+  suspendedAt    DateTime?
+  webhookId      String       @unique
+  webhook        Webhook      @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId])
 }

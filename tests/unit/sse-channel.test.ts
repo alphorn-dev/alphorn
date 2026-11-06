@@ -15,7 +15,7 @@ function send() {
   return handler.send(
     config,
     { title: "t", message: "m" },
-    { channelId: "c", deliveryId: "d" }
+    { channelId: "c", channelPublicId: "pub_c", deliveryId: "d" }
   );
 }
 
@@ -60,12 +60,29 @@ describe("sse channel", () => {
     await send();
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock.mock.calls[0][0]).toBe("http://sse:4000/publish/c");
+    expect(fetchMock.mock.calls[0][0]).toBe("http://sse:4000/publish/pub_c");
   });
 
   it("publishes locally in embedded mode (MODE=all)", async () => {
     vi.stubEnv("SSE_MODE", "");
     vi.stubEnv("MODE", "all");
     await expect(send()).resolves.toBeUndefined();
+  });
+
+  it("only reaches streams opened with the current publicId (rotation cuts old ones off)", async () => {
+    vi.stubEnv("SSE_MODE", "");
+    vi.stubEnv("MODE", "all");
+    const { addConnection, removeConnection } = await import("@/lib/sse/connection-registry");
+    const current = { write: vi.fn(), close: vi.fn() };
+    const rotatedAway = { write: vi.fn(), close: vi.fn() };
+    addConnection("pub_c", current, "203.0.113.10");
+    addConnection("pub_old", rotatedAway, "203.0.113.11");
+
+    await send();
+
+    expect(current.write).toHaveBeenCalledOnce();
+    expect(rotatedAway.write).not.toHaveBeenCalled();
+    removeConnection("pub_c", current);
+    removeConnection("pub_old", rotatedAway);
   });
 });

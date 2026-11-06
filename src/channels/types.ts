@@ -37,6 +37,8 @@ export interface ChannelOption {
 
 export interface DeliveryContext {
   channelId: string;
+  /** The channel's current publicId; SSE streams are keyed by it so rotating it cuts old streams off. */
+  channelPublicId?: string;
   deliveryId: string;
   trace?: string[];
 }

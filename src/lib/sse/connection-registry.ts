@@ -1,3 +1,6 @@
+// Connections are keyed by the channel's publicId (the stream URL), not its id:
+// rotating the publicId stops publishing to streams opened with the old URL.
+//
 // write() must never throw or reject; an implementation is responsible for
 // calling removeConnection() itself when the underlying stream is dead.
 type SseWriter = {

@@ -32,6 +32,7 @@ export default async function ProfilePage() {
         orgsRequiring2FACount={orgsRequiring2FA.length}
         mailerConfigured={isMailerConfigured()}
         userHasPassword={userHasPassword}
+        userHasTotp={!!session.user.twoFactorEnabled}
         passkeys={passkeys.map((p) => ({
           id: p.id,
           label: p.name || getAuthenticatorName(p.aaguid) || "Passkey",

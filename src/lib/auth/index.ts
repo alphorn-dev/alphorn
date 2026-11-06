@@ -8,11 +8,15 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../db";
 import { logger } from "../logger";
 import { isMailerConfigured, sendMail } from "../email/mailer";
-import { sessionSatisfies2FA } from "./two-factor-policy";
+import { oidcProviderId, sessionSatisfies2FA } from "./two-factor-policy";
 import { secondFactorAfter, secondFactorBefore } from "./second-factor-hooks";
 import { PASSKEY_SIGN_IN_PATH, SSO_SIGN_IN_PATHS } from "./second-factor";
 import { canCreateUser } from "./signup";
+import { isBillingEnabled } from "../billing/paddle";
+import { FREE_PROJECT_LIMIT } from "../billing/plans";
+import { effectivePlan } from "../billing/subscription";
 import { truncate } from "@/channels/truncate";
+import { errorLogFields } from "@/channels/errors";
 import {
   verificationEmailTemplate,
   invitationEmailTemplate,
@@ -20,6 +24,19 @@ import {
 } from "../email/templates";
 
 const mailerReady = isMailerConfigured();
+
+const trustedProxies = process.env.TRUSTED_PROXIES?.split(",")
+  .map((p) => p.trim())
+  .filter(Boolean);
+
+// The .env.example placeholder is public: a secret left at it lets anyone
+// forge what Better Auth and the webhook loop guard sign with it.
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.BETTER_AUTH_SECRET === "change-me-to-a-random-string"
+) {
+  throw new Error("BETTER_AUTH_SECRET is still the .env.example placeholder. Generate one with: openssl rand -base64 32");
+}
 
 function requireBaseUrl(): string {
   const url = process.env.BETTER_AUTH_URL;
@@ -40,7 +57,8 @@ async function trySendMail(
   try {
     await sendMail(to, subject, html);
   } catch (err) {
-    logger.error({ component: "mailer", label, error: err instanceof Error ? err.message : "Unknown error" }, "Failed to send email");
+    // Not err.message: SMTP rejections usually quote the recipient address.
+    logger.error({ component: "mailer", label, ...errorLogFields(err) }, "Failed to send email");
     throw err;
   }
 }
@@ -73,19 +91,96 @@ const ORG_PATHS_WITHOUT_2FA = new Set([
   "/organization/leave",
 ]);
 
+type OrgCtx = Parameters<typeof getSessionFromCtx>[0];
+
+// Never matches a project (ids are nanoids): stands in for a slug that resolves to none.
+const UNKNOWN_ORG = "~unknown-project~";
+
+/**
+ * Every project an organization API call could target. Better Auth's endpoints disagree on
+ * precedence (set-active prefers the id, get-full-organization and list-members the slug) and
+ * fall back to the active project only when neither is given (`||`, so "" counts as absent).
+ * Gates check all candidates, so no precedence or empty-value trick reaches an unchecked one.
+ */
+async function targetOrgIds(
+  ctx: OrgCtx,
+  session: { session: Record<string, unknown> },
+): Promise<string[]> {
+  const body = ctx.body as { organizationId?: unknown; organizationSlug?: unknown } | undefined;
+  const query = ctx.query as { organizationId?: unknown; organizationSlug?: unknown } | undefined;
+  const str = (v: unknown) => (typeof v === "string" && v ? [v] : []);
+  const ids = [...str(body?.organizationId), ...str(query?.organizationId)];
+  for (const slug of [...str(body?.organizationSlug), ...str(query?.organizationSlug)]) {
+    const org = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
+    ids.push(org?.id ?? UNKNOWN_ORG);
+  }
+  if (ids.length > 0) return [...new Set(ids)];
+  const active = session.session.activeOrganizationId;
+  return typeof active === "string" && active ? [active] : [];
+}
+
+// The member list and pending invitations hold the email address of everyone in a project.
+// Better Auth hands them to any member; in Alphorn only owners and admins see them, as on the
+// Members settings page. Members read their own role via get-active-member-role.
+const ORG_ADMIN_READ_PATHS = new Set([
+  "/organization/get-full-organization",
+  "/organization/list-members",
+  "/organization/list-invitations",
+]);
+
+async function assertOrgAdmin(ctx: OrgCtx): Promise<void> {
+  const session = await getSessionFromCtx(ctx);
+  if (!session) return; // the endpoint itself rejects unauthenticated calls
+  for (const orgId of await targetOrgIds(ctx, session)) {
+    const member = await prisma.member.findFirst({
+      where: { organizationId: orgId, userId: session.user.id },
+      select: { role: true },
+    });
+    const roles = member?.role.split(",").map((r) => r.trim()) ?? [];
+    if (!roles.some((r) => r === "owner" || r === "admin")) {
+      throw new APIError("FORBIDDEN", { message: "Only project owners and admins can see members" });
+    }
+  }
+}
+
+/**
+ * Hosted: a user may own FREE_PROJECT_LIMIT projects on the free plan, or the free quota
+ * multiplies with every new project. Every project is created through this endpoint.
+ */
+async function assertFreeProjectLimit(ctx: OrgCtx): Promise<void> {
+  if (!isBillingEnabled()) return;
+  const session = await getSessionFromCtx(ctx);
+  if (!session) return;
+  const owned = await prisma.member.findMany({
+    where: { userId: session.user.id, role: "owner" },
+    select: {
+      organization: {
+        select: { subscription: { select: { plan: true, status: true, currentPeriodEnd: true } } },
+      },
+    },
+  });
+  const free = owned.filter(
+    (m) => !m.organization.subscription || effectivePlan(m.organization.subscription) === "free",
+  ).length;
+  if (free >= FREE_PROJECT_LIMIT) {
+    throw new APIError("FORBIDDEN", {
+      message: `The free plan includes up to ${FREE_PROJECT_LIMIT} projects. Upgrade or delete a project to create another one.`,
+    });
+  }
+}
+
 /**
  * Enforces the project's `requireTwoFactor` on Better Auth's organization API,
  * which clients can call directly and so bypasses the server-action gate in
  * requireSession().
  */
-async function assertOrg2FA(ctx: Parameters<typeof getSessionFromCtx>[0]): Promise<void> {
+async function assertOrg2FA(ctx: OrgCtx): Promise<void> {
   const session = await getSessionFromCtx(ctx);
   if (!session) return; // the endpoint itself rejects unauthenticated calls
 
   const body = ctx.body as { organizationId?: string | null; organizationSlug?: string } | undefined;
-  const query = ctx.query as { organizationId?: string; organizationSlug?: string } | undefined;
   // set-active with organizationId: null clears the active project (resolveActiveOrgId() does
-  // this for a locked one). Checked before the `??` below, which turns null into "no id given"
+  // this for a locked one). Checked before targetOrgIds(), which treats null as "no id given"
   // and would test the active, locked project instead.
   if (
     ctx.path === "/organization/set-active" &&
@@ -94,19 +189,11 @@ async function assertOrg2FA(ctx: Parameters<typeof getSessionFromCtx>[0]): Promi
   ) {
     return;
   }
-  let orgId: string | null | undefined = body?.organizationId ?? query?.organizationId;
-  const slug = body?.organizationSlug ?? query?.organizationSlug;
-  if (!orgId && slug) {
-    orgId = (await prisma.organization.findUnique({ where: { slug }, select: { id: true } }))?.id;
-  }
-  orgId ??= session.session.activeOrganizationId;
-  if (!orgId) return;
-
-  const settings = await prisma.organizationSettings.findUnique({
-    where: { organizationId: orgId },
-    select: { requireTwoFactor: true },
+  const orgIds = await targetOrgIds(ctx, session);
+  const locked = await prisma.organizationSettings.count({
+    where: { organizationId: { in: orgIds }, requireTwoFactor: true },
   });
-  if (!settings?.requireTwoFactor) return;
+  if (locked === 0) return;
   if (await sessionSatisfies2FA(session)) return;
 
   throw new APIError("FORBIDDEN", {
@@ -137,12 +224,18 @@ export const auth = betterAuth({
   },
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
-    ipAddress: {
-      ipAddressHeaders: ["x-forwarded-for", "x-real-ip"],
-    },
+    // The client sets X-Forwarded-For itself, so a single value is only the
+    // real client IP when a proxy overwrites the header. With TRUSTED_PROXIES,
+    // Better Auth walks the chain from the right and skips those proxies, so a
+    // spoofed left-most entry can't mint fresh rate-limit buckets.
+    ipAddress: trustedProxies
+      ? { ipAddressHeaders: ["x-forwarded-for"], trustedProxies }
+      : { ipAddressHeaders: ["x-forwarded-for", "x-real-ip"] },
   },
   emailAndPassword: {
     enabled: true,
+    // A reset after a compromise must end the attacker's sessions too.
+    revokeSessionsOnPasswordReset: true,
     requireEmailVerification: mailerReady,
     ...(mailerReady && {
       sendResetPassword: async ({ user, url }) => {
@@ -176,6 +269,8 @@ export const auth = betterAuth({
       secondFactorAt: { type: "date", required: false, input: false },
       // When this session was created by an SSO sign-in (two-factor-policy.ts). Server-set only.
       ssoSignInAt: { type: "date", required: false, input: false },
+      // Provider of that SSO sign-in; only the OIDC IdP counts for project 2FA. Server-set only.
+      ssoProviderId: { type: "string", required: false, input: false },
     },
   },
   user: {
@@ -187,7 +282,11 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["github", "google", "microsoft"],
+      // Trusted providers link to an existing account by email even when the
+      // provider marks the email unverified. Microsoft (tenant "common") lets
+      // anyone set an arbitrary email in their own tenant, so it is not
+      // trusted: it links only when Better Auth sees a verified email.
+      trustedProviders: ["github", "google"],
     },
   },
   socialProviders: {
@@ -218,14 +317,19 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        // Signing in with a passkey proves the second factor on its own; an SSO sign-in is
-        // trusted for project 2FA requirements. Bound to this session, not the user.
+        // Signing in with a passkey proves the second factor on its own; an SSO sign-in counts
+        // as a recent sign-in, and through the OIDC IdP also for project 2FA requirements
+        // (two-factor-policy.ts). Bound to this session, not the user.
         before: async (session, ctx) => {
           if (ctx?.path === PASSKEY_SIGN_IN_PATH) {
             return { data: { ...session, secondFactorAt: new Date() } };
           }
           if (ctx?.path && SSO_SIGN_IN_PATHS.includes(ctx.path)) {
-            return { data: { ...session, ssoSignInAt: new Date() } };
+            // /callback/:id carries the provider in the path, /sign-in/social in the body.
+            const provider = (ctx.params?.id ?? ctx.body?.provider) as string | undefined;
+            return {
+              data: { ...session, ssoSignInAt: new Date(), ssoProviderId: provider ?? null },
+            };
           }
         },
       },
@@ -278,6 +382,12 @@ export const auth = betterAuth({
       if (ctx.path.startsWith("/organization/") && !ORG_PATHS_WITHOUT_2FA.has(ctx.path)) {
         await assertOrg2FA(ctx);
       }
+      if (ctx.path === "/organization/create") {
+        await assertFreeProjectLimit(ctx);
+      }
+      if (ORG_ADMIN_READ_PATHS.has(ctx.path)) {
+        await assertOrgAdmin(ctx);
+      }
     }),
     // Marks a session verified, resets the wrong-code count, signs out other sessions when a
     // factor is removed (./second-factor-hooks.ts).
@@ -327,7 +437,7 @@ export const auth = betterAuth({
           genericOAuth({
             config: [
               {
-                providerId: process.env.OIDC_PROVIDER_ID || "custom-oidc",
+                providerId: oidcProviderId()!,
                 clientId: process.env.OIDC_CLIENT_ID,
                 clientSecret: process.env.OIDC_CLIENT_SECRET!,
                 discoveryUrl: process.env.OIDC_DISCOVERY_URL,

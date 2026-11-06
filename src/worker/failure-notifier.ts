@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getChannel } from "@/channels";
 import { logger as rootLogger } from "@/lib/logger";
+import { errorLogFields } from "@/channels/errors";
 
 /**
  * The failed delivery, already loaded by the caller with its channel and the
@@ -61,6 +62,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
       ].join("\n"),
     }, {
       channelId: failureChannel.id,
+      channelPublicId: failureChannel.publicId,
       deliveryId: delivery.id,
     });
     logger.info(
@@ -69,6 +71,6 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
     );
   } catch (err) {
     // Silently fail - we don't want failure notifications to cause more failures
-    logger.error({ error: err instanceof Error ? err.message : "Unknown error", failureChannelId: failureChannel.id, failureChannelType: failureChannel.type }, "Failed to send failure notification");
+    logger.error({ ...errorLogFields(err), failureChannelId: failureChannel.id, failureChannelType: failureChannel.type }, "Failed to send failure notification");
   }
 }

@@ -22,10 +22,11 @@ const HOP_HEADERS = new Set([
 ]);
 const HOP_PREFIXES = ["x-forwarded-", "cf-", "x-amzn-"];
 
-// Shared secrets and signatures (X-Gitlab-Token, X-Hub-Signature-256,
-// Stripe-Signature, ...). Signatures would not verify anyway: the payload is
-// re-serialized from jsonb.
-const SECRET_PATTERN = /token|secret|signature|password/;
+// Shared secrets, keys and signatures (X-Gitlab-Token, X-Hub-Signature-256,
+// Stripe-Signature, Api-Key, X-Goog-Api-Key, X-Functions-Key, ...).
+// Signatures would not verify anyway: the payload is re-serialized from jsonb.
+// X-Event-Key (Bitbucket's event name) is the one "-key" header kept.
+const SECRET_PATTERN = /token|secret|signature|password|auth|hmac|credential|apikey|(?<!event)-key$|^key$/;
 
 /**
  * Request headers the Forward channel replays to its target, e.g.

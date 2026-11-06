@@ -25,8 +25,24 @@ export async function throwIfNotOk(
   // failure notifications, and some APIs echo the whole request back.
   const body = (await res.text()).slice(0, 500);
   const msg = `${label} error ${res.status}: ${body}`;
-  if (res.status !== 429 && res.status >= 400 && res.status < 500) {
-    throw new PermanentChannelError(msg);
-  }
-  throw new Error(msg);
+  const err =
+    res.status !== 429 && res.status >= 400 && res.status < 500
+      ? new PermanentChannelError(msg)
+      : new Error(msg);
+  throw Object.assign(err, { status: res.status });
+}
+
+/**
+ * Log fields for a delivery error without its message. Provider responses and SMTP replies
+ * can echo recipients or the notification itself, and logs go to Sentry (AGENTS.md: no PII or
+ * message bodies in logs). The full text stays in Delivery.lastError, shown to the project.
+ */
+export function errorLogFields(err: unknown): Record<string, unknown> {
+  const e = (err ?? {}) as { name?: unknown; code?: unknown; responseCode?: unknown; status?: unknown };
+  return {
+    errorName: err instanceof Error ? err.name : typeof err,
+    ...(e.status !== undefined && { status: e.status }),
+    ...(e.code !== undefined && { code: e.code }),
+    ...(e.responseCode !== undefined && { responseCode: e.responseCode }),
+  };
 }

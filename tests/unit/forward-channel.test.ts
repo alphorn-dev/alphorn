@@ -84,6 +84,14 @@ describe("forward channel", () => {
     expect(handler.configSchema.safeParse({ url: "https://ci.example.com/hooks" }).success).toBe(true);
   });
 
+  it("rejects a custom trace header in any letter case (would defeat loop detection)", () => {
+    for (const name of ["X-Alphorn-Trace", "x-alphorn-trace", "X-ALPHORN-TRACE"]) {
+      expect(
+        handler.configSchema.safeParse({ url: "https://ci.example.com/hooks", headers: { [name]: "x" } }).success,
+      ).toBe(false);
+    }
+  });
+
   it("throws on a failed response so the job is retried", async () => {
     globalThis.fetch = mockFetch(502) as unknown as typeof fetch;
     await expect(

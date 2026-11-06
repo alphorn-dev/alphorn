@@ -3,14 +3,20 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { getChannelMeta } from "@/channels/meta";
-import { updateChannel, deleteChannel, testChannel, getSseConnectionCount } from "../../actions";
+import {
+  updateChannel,
+  deleteChannel,
+  testChannel,
+  getSseConnectionCount,
+  regenerateChannelPublicId,
+} from "../../actions";
 import { ChannelConfigForm, SetupGuidePanel } from "@/components/channel-config-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
 import { WebhookHostHint, webhookConflict as isWebhookConflict } from "@/components/webhook-host-hint";
@@ -42,6 +48,7 @@ export default function EditChannelForm({
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [connectionCount, setConnectionCount] = useState<number | null>(null);
+  const [publicId, setPublicId] = useState(initialChannel.publicId);
   const origin = useSyncExternalStore(
     () => () => {},
     () => window.location.origin,
@@ -156,21 +163,38 @@ export default function EditChannelForm({
               <Label>Stream URL</Label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono break-all">
-                  {`${origin}/api/stream/${initialChannel.publicId}`}
+                  {`${origin}/api/stream/${publicId}`}
                 </code>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    navigator.clipboard.writeText(
-                      `${origin}/api/stream/${initialChannel.publicId}`
-                    );
+                    navigator.clipboard.writeText(`${origin}/api/stream/${publicId}`);
                     toast.success("Stream URL copied");
                   }}
                 >
                   <Copy data-icon />
                 </Button>
+                <ConfirmDialog
+                  trigger={
+                    <Button type="button" variant="outline" size="icon" aria-label="Regenerate stream URL">
+                      <RefreshCw data-icon />
+                    </Button>
+                  }
+                  title="Regenerate stream URL?"
+                  description="The current URL stops working immediately: open streams receive no further messages and new connections are refused. Update every client with the new URL."
+                  confirmLabel="Regenerate URL"
+                  onConfirm={async () => {
+                    try {
+                      setPublicId(await regenerateChannelPublicId(initialChannel.id));
+                      setConnectionCount(0);
+                      toast.success("Stream URL regenerated");
+                    } catch (err) {
+                      showError(err, "Failed to regenerate stream URL");
+                    }
+                  }}
+                />
               </div>
               <p className="text-xs text-muted-foreground">
                 Use this URL with EventSource in a browser or{" "}

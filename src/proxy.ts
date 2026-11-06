@@ -15,6 +15,7 @@ const publicPaths = [
   "/api/stream/",
   "/api/health",
   "/api/paddle/webhook",
+  "/api/github/webhook",
 ];
 
 export function proxy(request: NextRequest) {
