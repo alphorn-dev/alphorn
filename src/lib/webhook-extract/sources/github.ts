@@ -6,11 +6,22 @@ import {
   excerpt,
   lines,
   tags,
+  lookup,
   MAX_LIST_ITEMS,
   type AutoSource,
   type Body,
   type AutoResult,
 } from "./util";
+
+// Alert actions that open (or re-open) a finding and deserve a priority; resolving ones don't.
+const OPENING_ALERT = new Set(["created", "reopened", "reopened_by_user", "auto_reopened", "reintroduced", "appeared_in_branch"]);
+
+// GitHub advisory / CodeQL severities to Alphorn priority. CodeQL rules without a
+// security severity use error / warning / note.
+const SEVERITY_PRIORITY: Record<string, number> = {
+  critical: 5, high: 4, error: 4, medium: 3, moderate: 3, warning: 3, low: 2, note: 2,
+};
+const severityPriority = (severity: string) => lookup(SEVERITY_PRIORITY, severity.toLowerCase()) ?? null;
 
 function github(event: string, body: Body): AutoResult {
   const repo = str(body, "repository.full_name");
@@ -139,6 +150,108 @@ function github(event: string, body: Body): AutoResult {
         failed ? 4 : null
       );
     }
+
+    case "secret_scanning_alert": {
+      const type = str(body, "alert.secret_type_display_name") || str(body, "alert.secret_type");
+      const what =
+        action === "publicly_leaked" ? "leaked publicly" : action === "created" ? "detected" : action.replace(/_/g, " ");
+      return result(
+        `Secret ${what}: ${type || "unknown type"}`,
+        // Never the secret itself: only its type and the alert link.
+        lines(`Secret scanning alert #${num(body, "alert.number") ?? "?"}`, str(body, "alert.html_url")),
+        OPENING_ALERT.has(action) || action === "publicly_leaked" ? 5 : null
+      );
+    }
+
+    case "dependabot_alert": {
+      const severity = str(body, "alert.security_advisory.severity") || str(body, "alert.security_vulnerability.severity");
+      const pkg = str(body, "alert.dependency.package.name");
+      const fixedIn = str(body, "alert.security_vulnerability.first_patched_version.identifier");
+      return result(
+        `Dependabot: ${severity || "vulnerable"} ${pkg || "dependency"} ${action.replace(/_/g, " ")}`,
+        lines(
+          str(body, "alert.security_advisory.summary"),
+          [str(body, "alert.security_advisory.ghsa_id"), str(body, "alert.dependency.manifest_path")]
+            .filter(Boolean)
+            .join(" · "),
+          fixedIn && `Fixed in ${fixedIn}`,
+          str(body, "alert.html_url")
+        ),
+        OPENING_ALERT.has(action) ? severityPriority(severity) : null
+      );
+    }
+
+    case "code_scanning_alert": {
+      const severity = str(body, "alert.rule.security_severity_level") || str(body, "alert.rule.severity");
+      const path = str(body, "alert.most_recent_instance.location.path");
+      const line = num(body, "alert.most_recent_instance.location.start_line");
+      return result(
+        `Code scanning: ${str(body, "alert.rule.description") || "alert"} ${action.replace(/_/g, " ")}`,
+        lines(
+          [str(body, "alert.tool.name"), severity].filter(Boolean).join(" · "),
+          path && `${path}${line ? `:${line}` : ""}`,
+          str(body, "alert.html_url")
+        ),
+        OPENING_ALERT.has(action) ? severityPriority(severity) : null
+      );
+    }
+
+    case "repository_advisory":
+      return result(
+        `Security advisory ${action}: ${str(body, "repository_advisory.summary")}`,
+        lines(
+          [str(body, "repository_advisory.ghsa_id"), str(body, "repository_advisory.severity")].filter(Boolean).join(" · "),
+          str(body, "repository_advisory.html_url")
+        ),
+        action === "reported" ? 4 : action === "published" ? 3 : null
+      );
+
+    case "deployment_status": {
+      const state = str(body, "deployment_status.state");
+      const env = str(body, "deployment_status.environment") || str(body, "deployment.environment");
+      return result(
+        `Deployment to ${env || "environment"} ${state.replace(/_/g, " ") || action}`,
+        lines(
+          [str(body, "deployment.ref"), str(body, "deployment_status.description")].filter(Boolean).join(" · "),
+          str(body, "deployment_status.environment_url") ||
+            str(body, "deployment_status.log_url") ||
+            str(body, "deployment_status.target_url")
+        ),
+        state === "failure" || state === "error" ? 4 : null
+      );
+    }
+
+    case "deployment_review": {
+      const env =
+        str(body, "environment") || str(list(body, "workflow_job_runs")[0], "environment");
+      const who = str(body, "approver.login") || str(body, "requestor.login") || sender;
+      return result(
+        action === "requested"
+          ? `Deployment approval requested for ${env || "an environment"}`
+          : `Deployment to ${env || "environment"} ${action} by ${who}`,
+        lines(str(body, "workflow_run.display_title"), str(body, "workflow_run.html_url")),
+        action === "requested" ? 3 : null
+      );
+    }
+
+    case "discussion":
+      return result(
+        `Discussion #${num(body, "discussion.number") ?? "?"} ${action}: ${str(body, "discussion.title")}`,
+        lines(
+          `${sender} ${action} the discussion`,
+          action === "created" ? excerpt(str(body, "discussion.body")) : "",
+          str(body, "discussion.html_url")
+        )
+      );
+
+    case "discussion_comment":
+      return result(
+        `Comment ${action} on discussion #${num(body, "discussion.number") ?? "?"}: ${str(body, "discussion.title")}`,
+        lines(
+          `${str(body, "comment.user.login") || sender}: ${excerpt(str(body, "comment.body"))}`,
+          str(body, "comment.html_url")
+        )
+      );
 
     case "create":
     case "delete":

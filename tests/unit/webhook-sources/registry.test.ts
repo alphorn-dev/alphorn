@@ -24,6 +24,7 @@ const CASES: Case[] = [
   ["jira", { webhookEvent: "jira:issue_created", issue: { key: "PROJ-1", fields: { summary: "S" } } }],
   ["alchemy", { webhookId: "wh_test", type: "ADDRESS_ACTIVITY", event: { network: "ETH_MAINNET", activity: [] } }],
   ["stripe", { object: "event", type: "charge.succeeded", data: { object: {} } }],
+  ["railway", { type: "Deployment.failed", resource: { project: { id: "p1", name: "shop" } }, severity: "WARNING" }],
   ["azure-monitor", { schemaId: "azureMonitorCommonAlertSchema", data: { essentials: { alertRule: "cpu" } } }],
   ["gcp-monitoring", { version: "1.2", incident: { incident_id: "abc123", policy_name: "cpu", state: "open" } }],
   ["statuspage", { meta: { unsubscribe: "https://example.com/u" }, page: { id: "abc123" }, incident: { name: "Outage", status: "investigating" } }],

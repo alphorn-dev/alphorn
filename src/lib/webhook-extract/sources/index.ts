@@ -22,6 +22,7 @@ import { opsgenieSource } from "./opsgenie";
 import { overseerrSource } from "./overseerr";
 import { paddleSource } from "./paddle";
 import { pagerdutySource } from "./pagerduty";
+import { railwaySource } from "./railway";
 import { sentrySource } from "./sentry";
 import { shopifySource } from "./shopify";
 import { statuspageSource } from "./statuspage";
@@ -53,6 +54,7 @@ export const SOURCES: AutoSource[] = [
   alchemySource,
   stripeSource,
   // Payload shape only.
+  railwaySource,
   azureMonitorSource,
   gcpMonitoringSource,
   statuspageSource,

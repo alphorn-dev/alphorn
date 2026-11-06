@@ -18,6 +18,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+const GROUPS = [...new Set(GITHUB_EVENTS.map((e) => e.group))];
+
 interface WebhookGithubProps {
   webhookId: string;
   manageUrl: string;
@@ -74,18 +76,23 @@ export function WebhookGithub({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {GITHUB_EVENTS.map((e) => (
-            <label key={e.id} className="flex items-center gap-3 rounded-md border p-3">
-              <Checkbox
-                checked={events.has(e.id)}
-                onCheckedChange={() => toggle(e.id)}
-                disabled={!isAdminOrOwner || saving}
-              />
-              <Label className="font-normal">{e.label}</Label>
-            </label>
-          ))}
-        </div>
+        {GROUPS.map((group) => (
+          <div key={group} className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">{group}</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {GITHUB_EVENTS.filter((e) => e.group === group).map((e) => (
+                <label key={e.id} className="flex items-center gap-3 rounded-md border p-3">
+                  <Checkbox
+                    checked={events.has(e.id)}
+                    onCheckedChange={() => toggle(e.id)}
+                    disabled={!isAdminOrOwner || saving}
+                  />
+                  <Label className="font-normal">{e.label}</Label>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
         <div className="flex flex-wrap items-center gap-2">
           {isAdminOrOwner && (
             <Button onClick={save} disabled={!dirty || saving}>

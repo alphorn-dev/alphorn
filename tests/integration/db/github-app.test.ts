@@ -216,6 +216,21 @@ describe("GitHub webhook endpoint", () => {
     expect(message.tags).toEqual(expect.arrayContaining(["github", "pull_request"]));
   });
 
+  it("never stores a secret value from a secret scanning alert", async () => {
+    const link = await connected(104);
+    const res = await deliver("secret_scanning_alert", {
+      action: "created",
+      installation: { id: 104 },
+      repository: { full_name: "hans/repo", name: "repo" },
+      alert: { number: 1, secret_type_display_name: "GitHub PAT", secret: "ghp_LEAKEDVALUE", html_url: "https://x" },
+    });
+
+    expect(res.status).toBe(201);
+    const message = await prisma.message.findFirstOrThrow({ where: { webhookId: link.webhookId } });
+    expect(message.priority).toBe(5);
+    expect(JSON.stringify(message)).not.toContain("ghp_LEAKEDVALUE");
+  });
+
   it("drops unselected events without creating a message", async () => {
     const link = await connected(101);
     const res = await deliver("push", { ...prOpened(101), ref: "refs/heads/main" });

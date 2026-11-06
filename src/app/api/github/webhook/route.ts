@@ -20,6 +20,14 @@ const envelopeSchema = z.object({
 
 const ignored = (reason: string) => NextResponse.json({ ignored: reason }, { status: 202 });
 
+// The full payload is stored and shown to every project member. Never store a leaked
+// secret's value, should a secret scanning payload carry one (alert.secret).
+function withoutSecretValue(rawBody: string): string {
+  const body = JSON.parse(rawBody) as { alert?: Record<string, unknown> };
+  if (body.alert && "secret" in body.alert) delete body.alert.secret;
+  return JSON.stringify(body);
+}
+
 /** Receives every event of every installation of the GitHub App and routes it by installation id. */
 export async function POST(req: Request) {
   const config = githubAppConfig();
@@ -96,6 +104,6 @@ export async function POST(req: Request) {
     req,
     logger: log.child({ webhookId: webhook.id }),
     trace: [webhook.publicId],
-    rawBody,
+    rawBody: event.startsWith("secret_scanning") ? withoutSecretValue(rawBody) : rawBody,
   });
 }

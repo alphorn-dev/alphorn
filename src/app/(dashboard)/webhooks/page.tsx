@@ -17,10 +17,20 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { SquarePen } from "lucide-react";
+import { ChevronDown, GitPullRequest, SquarePen, Webhook } from "lucide-react";
 import { formatDate } from "@/lib/format-date";
 import { githubAppConfig, installUrl } from "@/lib/github/app";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
+// Reasons /api/github/callback redirects back here with (?github_error=...).
 const GITHUB_ERRORS: Record<string, string> = {
   permission: "Only project owners and admins can connect GitHub.",
   state: "The GitHub connection expired or was started from another project. Please try again.",
@@ -29,7 +39,7 @@ const GITHUB_ERRORS: Record<string, string> = {
   "org-admin": "Only owners of the GitHub organization can connect its installation.",
   limit: "Webhook limit reached. Upgrade your plan or delete a webhook to connect GitHub.",
   linked: "This GitHub installation is already connected to another project.",
-  install: "Missing or invalid GitHub installation. Start again with Connect GitHub.",
+  install: "Missing or invalid GitHub installation. Please try again.",
 };
 
 export default async function WebhooksPage({
@@ -61,12 +71,6 @@ export default async function WebhooksPage({
             Manage your inbound webhooks.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-        {isAdminOrOwner && githubConfig && !limitReached && (
-          <a href={installUrl(githubConfig)}>
-            <Button variant="outline">Connect GitHub</Button>
-          </a>
-        )}
         {isAdminOrOwner &&
           (limitReached ? (
             <Tooltip>
@@ -78,16 +82,67 @@ export default async function WebhooksPage({
                 Upgrade your plan for more.
               </TooltipContent>
             </Tooltip>
+          ) : githubConfig ? (
+            // "From an app" sources: GitHub today, more integrations later.
+            // Split button: the main part creates a custom webhook, the arrow
+            // opens "From an app" sources (GitHub today, more integrations later).
+            <div className="flex">
+              <Link href="/webhooks/new">
+                <Button className="rounded-r-none border-r-0">Create webhook</Button>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      size="icon"
+                      className="rounded-l-none border-l-primary-foreground/20"
+                      aria-label="More ways to create a webhook"
+                    />
+                  }
+                >
+                  <ChevronDown />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuItem render={<Link href="/webhooks/new" />} className="items-start">
+                    <Webhook className="mt-0.5" />
+                    <div>
+                      <div>Webhook URL</div>
+                      <div className="text-xs text-muted-foreground">
+                        For any service that can send webhooks
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>From an app</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      render={<a href={installUrl(githubConfig)} />}
+                      className="items-start"
+                    >
+                      <GitPullRequest className="mt-0.5" />
+                      <div>
+                        <div>GitHub repositories</div>
+                        <div className="text-xs text-muted-foreground">
+                          Pick repositories on GitHub, no setup per repo
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
             <Link href="/webhooks/new">
               <Button>Create webhook</Button>
             </Link>
           ))}
-        </div>
       </div>
 
       {githubError && (
-        <p role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+        <p
+          role="alert"
+          className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+        >
           {githubError}
         </p>
       )}
