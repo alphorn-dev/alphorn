@@ -4,6 +4,7 @@ import { configureEgressProxy } from "@/lib/http/egress";
 import { APP_VERSION } from "@/lib/version";
 import { startWorker } from "./index";
 import { stopQueue } from "@/lib/queue";
+import { startSecretEncryption } from "@/lib/crypto/encrypt-existing";
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -23,6 +24,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 configureEgressProxy();
+startSecretEncryption();
 logger.info({ component: "worker", mode: "standalone" }, "Starting Alphorn worker");
 await startWorker();
 

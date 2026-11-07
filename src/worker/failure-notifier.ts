@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getChannel } from "@/channels";
 import { logger as rootLogger } from "@/lib/logger";
 import { errorLogFields } from "@/channels/errors";
+import { decryptJson } from "@/lib/crypto/secrets";
 
 /**
  * The failed delivery, already loaded by the caller with its channel and the
@@ -50,7 +51,7 @@ export async function notifyFailure(delivery: FailedDelivery): Promise<void> {
     // every other send path applies (mirrors deliver.ts). A parse failure or
     // unknown handler is swallowed by the catch - a broken failure channel
     // must not crash the delivery that triggered this notification.
-    const config = handler.configSchema.parse(failureChannel.config);
+    const config = handler.configSchema.parse(decryptJson(failureChannel.config));
     await handler.send(config, {
       title: "Delivery failed",
       message: [

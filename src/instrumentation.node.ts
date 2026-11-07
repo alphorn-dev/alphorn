@@ -2,6 +2,10 @@ export async function register() {
   const { configureEgressProxy } = await import("./lib/http/egress");
   configureEgressProxy();
 
+  // Every mode, so a web-only deployment also encrypts existing secrets.
+  const { startSecretEncryption } = await import("./lib/crypto/encrypt-existing");
+  startSecretEncryption();
+
   // Only start the embedded worker in "all" mode (default).
   // MODE=web skips it; MODE=worker uses the standalone worker entry point.
   const mode = process.env.MODE ?? "all";

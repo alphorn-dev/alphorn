@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { randomBytes } from "crypto";
+import { encryptJson } from "@/lib/crypto/secrets";
 import { prisma } from "@/lib/db";
 import { handleDelivery } from "@/worker/deliver";
 import { createDeliveryFixture } from "../helpers/factories";
@@ -30,6 +32,25 @@ describe("handleDelivery - worker integration", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.notification.message).toBe("World");
     expect(calls[0]!.context.deliveryId).toBe(deliveryId);
+  });
+
+  it("decrypts an encrypted channel config before sending", async () => {
+    const { deliveryId } = await createDeliveryFixture();
+    const delivery = await getDelivery(deliveryId);
+    process.env.ENCRYPTION_KEY = randomBytes(32).toString("base64");
+    try {
+      await prisma.channel.update({
+        where: { id: delivery.channelId },
+        data: { config: encryptJson({ label: "secret-label" }) },
+      });
+
+      await handleDelivery({ deliveryId });
+
+      expect((await getDelivery(deliveryId)).status).toBe("DELIVERED");
+      expect(testChannelCalls()[0]!.config).toEqual({ label: "secret-label" });
+    } finally {
+      delete process.env.ENCRYPTION_KEY;
+    }
   });
 
   it("records FAILED and re-throws on a transient error when attempts remain", async () => {

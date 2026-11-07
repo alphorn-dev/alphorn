@@ -75,6 +75,7 @@ Hosted at **alphorn.dev**. Legal docs and user-facing marketing/docs content liv
 - **State**: React hooks + Next.js patterns. No external state library (no Redux/Zustand).
 - **Toasts**: Use Sonner (`toast` from `sonner`). For error toasts use `showError(err, fallback)` from `@/lib/toast-error`.
 - **Date display**: Use the helpers in `@/lib/format-date` (`formatDateTime`, `formatDate`, `formatShortDate`, `formatChartDate`). Do not call date-fns `format` directly in components.
+- **Secrets at rest**: Store third-party credentials through `encryptJson` / `decryptJson` from `@/lib/crypto/secrets` (AES-256-GCM, optional `ENCRYPTION_KEY`, plaintext when unset). New secret columns must also be added to `encryptExistingSecrets()` in `src/lib/crypto/encrypt-existing.ts` so existing rows get encrypted when the key is set.
 - **Untrusted payload paths**: Resolve dotted paths into webhook payloads with `resolvePath` from `@/lib/safe-path` (blocks prototype keys). Do not hand-roll path walking.
 - **Forms**: React hooks with controlled inputs. Zod for validation.
 - **Path alias**: `@/*` maps to `src/*`.

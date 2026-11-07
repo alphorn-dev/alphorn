@@ -7,6 +7,7 @@ import { errorLogFields, isExternalDeliveryError, isPermanentChannelError, Perma
 import { notifyFailure } from "./failure-notifier";
 import type { Notification } from "@/channels/types";
 import { logger as rootLogger } from "@/lib/logger";
+import { decryptJson } from "@/lib/crypto/secrets";
 
 export const MAX_RETRIES = 5;
 
@@ -174,7 +175,7 @@ export async function handleDelivery(data: DeliveryJobData): Promise<void> {
     // so surface it as PermanentChannelError to short-circuit retries.
     let config: unknown;
     try {
-      config = handler.configSchema.parse(delivery.channel.config);
+      config = handler.configSchema.parse(decryptJson(delivery.channel.config));
     } catch (parseErr) {
       if (parseErr instanceof ZodError) {
         throw new PermanentChannelError(`Invalid channel config: ${parseErr.message}`);

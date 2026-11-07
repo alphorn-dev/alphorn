@@ -8,6 +8,7 @@ import { generateChannelId, generatePublicId } from "@/lib/api-key";
 import { revalidatePath } from "next/cache";
 import { resourceNameSchema } from "@/lib/schemas";
 import type { Prisma } from "@/generated/prisma/client";
+import { decryptJson, encryptJson } from "@/lib/crypto/secrets";
 
 export async function getChannelsForOrg() {
   const session = await requireSession();
@@ -34,9 +35,10 @@ export async function getChannelById(id: string) {
   // Returns the full row including config (credentials) - admin/owner only.
   const { orgId } = await requireAdminOrOwner();
 
-  return prisma.channel.findFirst({
+  const channel = await prisma.channel.findFirst({
     where: { id, organizationId: orgId, deletedAt: null },
   });
+  return channel && { ...channel, config: decryptJson(channel.config) };
 }
 
 export async function createChannel(data: {
@@ -70,7 +72,7 @@ export async function createChannel(data: {
       id: generateChannelId(),
       name: resourceNameSchema.parse(data.name),
       type: data.type,
-      config: config as Prisma.InputJsonValue,
+      config: encryptJson(config) as Prisma.InputJsonValue,
       organizationId: orgId,
       publicId: crypto.randomUUID(),
     },
@@ -119,7 +121,7 @@ export async function updateChannel(
     where: { id },
     data: {
       name: resourceNameSchema.parse(data.name),
-      config: config as Prisma.InputJsonValue,
+      config: encryptJson(config) as Prisma.InputJsonValue,
       enabled: data.enabled,
     },
   });
@@ -176,7 +178,7 @@ export async function testChannel(id: string) {
   if (!handler) throw new Error(`Unknown channel type: ${channel.type}`);
   if (!handler.test) throw new Error("This channel does not support testing");
 
-  await handler.test(handler.configSchema.parse(channel.config));
+  await handler.test(handler.configSchema.parse(decryptJson(channel.config)));
 }
 
 export async function getSseConnectionCount(channelId: string): Promise<number> {
