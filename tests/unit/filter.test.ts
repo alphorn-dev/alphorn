@@ -194,9 +194,12 @@ describe("evaluateCondition - string fields (title, message)", () => {
     expect(evaluateCondition(msg(), c)).toBe(false);
   });
 
-  it("regex rejects ReDoS patterns", () => {
-    const c: FilterCondition = { field: "title", operator: "regex", value: "(a+)+$" };
-    expect(evaluateCondition(msg(), c)).toBe(false);
+  it("regex runs in linear time on catastrophic-backtracking patterns", () => {
+    // Backtracking engines hang for minutes on this; RE2 answers instantly.
+    const c: FilterCondition = { field: "title", operator: "regex", value: ".*.*.*.*b" };
+    const start = Date.now();
+    expect(evaluateCondition(msg({ title: "a".repeat(20000) }), c)).toBe(false);
+    expect(Date.now() - start).toBeLessThan(1000);
   });
 
   it("returns false for an unknown string operator", () => {

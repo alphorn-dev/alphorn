@@ -5,6 +5,30 @@ import { limitsForSubscription } from "@/lib/billing/subscription";
 import { logger } from "@/lib/logger";
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const DELETE_BATCH_SIZE = 1000;
+
+/**
+ * Delete the orgs' messages older than `cutoff` (deliveries cascade) in small
+ * batches, so a first run or a plan downgrade never becomes one huge DELETE
+ * holding locks for minutes. SKIP LOCKED lets every worker instance run the
+ * sweep at once without blocking each other on the same rows.
+ */
+export async function deleteMessagesBefore(orgIds: string[], cutoff: Date): Promise<number> {
+  let total = 0;
+  for (;;) {
+    const deleted = await prisma.$executeRaw`
+      DELETE FROM "Message" WHERE "id" IN (
+        SELECT m."id" FROM "Message" m
+        JOIN "Webhook" w ON w."id" = m."webhookId"
+        WHERE w."organizationId" = ANY(${orgIds}::text[]) AND m."createdAt" < ${cutoff}
+        LIMIT ${DELETE_BATCH_SIZE}
+        FOR UPDATE OF m SKIP LOCKED
+      )
+    `;
+    total += deleted;
+    if (deleted < DELETE_BATCH_SIZE) return total;
+  }
+}
 
 export function startRetentionSweep() {
   if (!isBillingEnabled()) {
@@ -36,7 +60,7 @@ export function startRetentionSweep() {
       });
 
       // Group orgs by their effective retention window so each distinct
-      // window gets a single deleteMany, instead of one per org per sweep.
+      // window gets a single batched delete, instead of one per org per sweep.
       const orgIdsByRetentionDays = new Map<number, string[]>();
       for (const org of orgs) {
         // Effective plan: a paused or lapsed subscription retains like free.
@@ -55,33 +79,28 @@ export function startRetentionSweep() {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - retentionDays);
 
-        const deleted = await prisma.message.deleteMany({
-          where: {
-            webhook: { organizationId: { in: orgIds } },
-            createdAt: { lt: cutoff },
-          },
-        });
+        const deleted = await deleteMessagesBefore(orgIds, cutoff);
 
-        if (deleted.count > 0) {
+        if (deleted > 0) {
           logger.info(
             {
               component: "retention",
               orgCount: orgIds.length,
-              deleted: deleted.count,
+              deleted,
               retentionDays,
             },
             "Swept old messages",
           );
         }
       }
+
+      // Usage counters only matter for the current billing period (at most
+      // ~31 days); keep two months for support lookups.
+      const counterCutoff = new Date();
+      counterCutoff.setDate(counterCutoff.getDate() - 62);
+      await prisma.usageCounter.deleteMany({ where: { hour: { lt: counterCutoff } } });
     } catch (err) {
-      logger.error(
-        {
-          component: "retention",
-          error: err instanceof Error ? err.message : "Unknown",
-        },
-        "Retention sweep failed",
-      );
+      logger.error({ component: "retention", err }, "Retention sweep failed");
     }
   }
 

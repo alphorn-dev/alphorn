@@ -32,7 +32,7 @@ export default async function MessageDetailPage({
     <div className="max-w-3xl">
       <div className="flex items-center gap-4">
         <Link href="/messages">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Back to messages">
             <ArrowLeft data-icon />
           </Button>
         </Link>

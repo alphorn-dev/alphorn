@@ -29,7 +29,7 @@ export function startSweep() {
       await recoverLostFailedDeliveries();
       await expireUndeliveredDeliveries();
     } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, "Sweep failed");
+      logger.error({ err }, "Sweep failed");
     }
   }, SWEEP_INTERVAL_MS);
 

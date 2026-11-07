@@ -68,7 +68,19 @@ export async function getSubscriptionStatus() {
   };
 }
 
-export async function getCheckoutData(targetPlan: PlanId) {
+/**
+ * Start an upgrade or resubscribe. Orgs without a live Paddle subscription get
+ * checkout data for a new one. Orgs that still have one (active, past_due, or
+ * cancelled but running to period end) get it changed in place: a second
+ * checkout would create a second subscription and bill the customer twice.
+ * The subscription.updated webhook then syncs the new plan.
+ */
+export async function startPlanChange(
+  targetPlan: PlanId,
+): Promise<
+  | { kind: "checkout"; priceId: string; customerId: string | null; email: string; organizationId: string }
+  | { kind: "changed" }
+> {
   const { session, orgId } = await requireAdminOrOwner();
 
   const priceId = getPaddlePriceId(targetPlan);
@@ -76,7 +88,31 @@ export async function getCheckoutData(targetPlan: PlanId) {
 
   const sub = await getOrCreateSubscription(orgId);
 
+  if (sub.paddleSubscriptionId) {
+    const paddle = getPaddle();
+    if (!paddle) throw new Error("Billing not configured");
+    // Ask Paddle, not our row: the webhook that ended or changed it may lag.
+    const live = await paddle.subscriptions.get(sub.paddleSubscriptionId);
+    if (live.status !== "canceled") {
+      if (live.status === "paused") {
+        throw new Error("Your subscription is paused. Resume it via Manage billing first.");
+      }
+      // Paddle rejects item changes while a change (e.g. cancel) is scheduled.
+      if (live.scheduledChange) {
+        await paddle.subscriptions.update(live.id, { scheduledChange: null });
+      }
+      if (!live.items.some((item) => item.price?.id === priceId)) {
+        await paddle.subscriptions.update(live.id, {
+          items: [{ priceId, quantity: 1 }],
+          prorationBillingMode: "prorated_immediately",
+        });
+      }
+      return { kind: "changed" };
+    }
+  }
+
   return {
+    kind: "checkout",
     priceId,
     customerId: sub.paddleCustomerId,
     email: session.user.email,

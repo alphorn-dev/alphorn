@@ -88,6 +88,7 @@ export default function NewChannelForm({ appUrl }: { appUrl: string }) {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Back to channels"
             onClick={() => router.push("/channels")}
           >
             <ArrowLeft data-icon />
@@ -167,6 +168,7 @@ export default function NewChannelForm({ appUrl }: { appUrl: string }) {
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Back to channel types"
           onClick={() => {
             setSelectedType(null);
             setConfig({});

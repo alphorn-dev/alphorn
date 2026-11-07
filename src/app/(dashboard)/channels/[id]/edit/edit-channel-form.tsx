@@ -115,6 +115,7 @@ export default function EditChannelForm({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Back to channels"
           onClick={() => router.push("/channels")}
         >
           <ArrowLeft data-icon />
@@ -169,6 +170,7 @@ export default function EditChannelForm({
                   type="button"
                   variant="outline"
                   size="icon"
+                  aria-label="Copy stream URL"
                   onClick={() => {
                     navigator.clipboard.writeText(`${origin}/api/stream/${publicId}`);
                     toast.success("Stream URL copied");

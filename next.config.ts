@@ -28,12 +28,7 @@ const nextConfig: NextConfig = {
       headers: [
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "X-Frame-Options", value: "DENY" },
-        // ponytail: no script-src yet; Next's inline scripts need per-request nonces (proxy.ts +
-        // dynamic rendering). These directives are safe without them.
-        {
-          key: "Content-Security-Policy",
-          value: "base-uri 'self'; object-src 'none'; frame-ancestors 'none'",
-        },
+        // Content-Security-Policy is set per request in src/proxy.ts (it carries a nonce).
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         {
           key: "Strict-Transport-Security",

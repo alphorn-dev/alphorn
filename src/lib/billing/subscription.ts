@@ -124,16 +124,23 @@ export function usagePeriodStart(
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Messages received since `since`, summed from the hourly UsageCounter.
+ * ponytail: hour buckets, so up to 59 min before `since` counts too; fine
+ * for a monthly quota, use a finer bucket if exact boundaries ever matter.
+ */
 export async function countMessagesInPeriod(
   organizationId: string,
   since: Date,
 ): Promise<number> {
-  return prisma.message.count({
-    where: {
-      webhook: { organizationId },
-      createdAt: { gte: since },
-    },
+  const hour = new Date(Math.floor(since.getTime() / HOUR_MS) * HOUR_MS);
+  const { _sum } = await prisma.usageCounter.aggregate({
+    _sum: { count: true },
+    where: { organizationId, hour: { gte: hour } },
   });
+  return _sum.count ?? 0;
 }
 
 export function isWithinQuota(

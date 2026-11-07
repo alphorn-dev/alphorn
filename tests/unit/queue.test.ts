@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   constructor: vi.fn(),
+  on: vi.fn(),
 }));
 
 vi.mock("pg-boss", () => ({
@@ -14,6 +15,10 @@ vi.mock("pg-boss", () => ({
     async start() {
       return mocks.start();
     }
+
+    on(event: string, listener: unknown) {
+      mocks.on(event, listener);
+    }
   },
 }));
 
@@ -21,6 +26,7 @@ describe("getQueue", () => {
   beforeEach(() => {
     mocks.start.mockReset();
     mocks.constructor.mockReset();
+    mocks.on.mockReset();
     vi.resetModules();
     delete (globalThis as { pgBoss?: unknown }).pgBoss;
     delete (globalThis as { pgBossStarted?: boolean }).pgBossStarted;
@@ -36,5 +42,11 @@ describe("getQueue", () => {
     expect(first).toBe(second);
     expect(mocks.constructor).toHaveBeenCalledOnce();
     expect(mocks.start).toHaveBeenCalledOnce();
+  });
+
+  it("registers an error listener so pg-boss errors don't kill the worker loop", async () => {
+    const { getQueue } = await import("@/lib/queue");
+    await getQueue();
+    expect(mocks.on).toHaveBeenCalledWith("error", expect.any(Function));
   });
 });

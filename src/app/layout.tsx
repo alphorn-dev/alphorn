@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,26 +18,29 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://app.alphorn.dev"),
-  title: "Alphorn (Beta)",
+  title: "Alphorn",
   description: "Self-hostable notification routing",
   openGraph: {
-    title: "Alphorn (Beta)",
+    title: "Alphorn",
     description: "Self-hostable notification routing",
     images: ["/og-image.png"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Alphorn (Beta)",
+    title: "Alphorn",
     description: "Self-hostable notification routing",
     images: ["/og-image.png"],
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Reading the CSP nonce (set by src/proxy.ts) makes every page dynamic,
+  // which Next needs to stamp the nonce on its scripts.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -44,7 +48,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <TooltipProvider>
             {children}
           </TooltipProvider>

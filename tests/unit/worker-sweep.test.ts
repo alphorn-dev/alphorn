@@ -234,12 +234,12 @@ describe("startSweep", () => {
     expect(() => startSweep()).not.toThrow();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      { error: "db issue" },
+      { err: expect.objectContaining({ message: "db issue" }) },
       "Sweep failed"
     );
   });
 
-  it("stringifies non-Error failures when logging", async () => {
+  it("logs non-Error failures as-is", async () => {
     mocks.updateMany.mockRejectedValue("boom");
 
     const { startSweep } = await import("@/worker/sweep");
@@ -247,7 +247,7 @@ describe("startSweep", () => {
 
     await vi.advanceTimersByTimeAsync(60_000);
     expect(mocks.loggerError).toHaveBeenCalledWith(
-      { error: "boom" },
+      { err: "boom" },
       "Sweep failed"
     );
   });

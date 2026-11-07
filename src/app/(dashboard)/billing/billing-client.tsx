@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
-  getCheckoutData,
+  startPlanChange,
   cancelSubscription,
   getMessagePackCheckoutData,
   getSubscriptionStatus,
@@ -164,7 +164,12 @@ export function BillingClient({ data }: { data: BillingData }) {
   async function handleUpgrade(plan: PlanId) {
     setLoading(plan);
     try {
-      const checkout = await getCheckoutData(plan);
+      const checkout = await startPlanChange(plan);
+      if (checkout.kind === "changed") {
+        toast.success("Plan updated. It may take a few seconds to show here.");
+        router.refresh();
+        return;
+      }
       if (!window.Paddle) {
         toast.error("Payment system not loaded. Please try again.");
         return;

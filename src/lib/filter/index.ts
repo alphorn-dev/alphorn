@@ -1,5 +1,5 @@
 import type { FilterDefinition, FilterCondition } from "./schema";
-import isSafeRegex from "safe-regex2";
+import { compileFilterRegex } from "./regex";
 import { resolvePath } from "@/lib/safe-path";
 
 export interface FilterMessage {
@@ -111,13 +111,7 @@ function evaluateString(
     case "starts_with":
       return lower.startsWith(lowerValue);
     case "regex":
-      try {
-        const re = new RegExp(value, "i");
-        if (!isSafeRegex(re)) return false;
-        return re.test(text);
-      } catch {
-        return false;
-      }
+      return compileFilterRegex(value)?.test(text) ?? false;
     default:
       return false;
   }

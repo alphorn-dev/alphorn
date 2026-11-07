@@ -85,9 +85,6 @@ export function AppSidebar() {
         <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
           <Image src="/logo.svg" alt="Alphorn" width={28} height={28} />
           Alphorn
-          <span className="ml-0.5 rounded-sm bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-            Beta
-          </span>
         </Link>
         <div className="mt-3">
           <OrgSwitcher />

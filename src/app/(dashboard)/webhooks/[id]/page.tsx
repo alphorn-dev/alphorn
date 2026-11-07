@@ -37,7 +37,7 @@ export default async function WebhookDetailPage({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/webhooks">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Back to webhooks">
               <ArrowLeft data-icon />
             </Button>
           </Link>

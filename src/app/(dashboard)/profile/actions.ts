@@ -196,6 +196,10 @@ export async function deleteAccount(password?: string): Promise<DeleteAccountRes
     // Delete the user - cascades: Sessions, Accounts, TwoFactors,
     // remaining Members, Invitations, InviteLinks
     await tx.user.delete({ where: { id: userId } });
-  });
+    // The org cascade deletes every Message and Delivery (plus their GIN
+    // index entries); Prisma's 5s default aborts that for large projects.
+    // ponytail: one long transaction; batch-purge messages first if 2 min
+    // ever isn't enough.
+  }, { timeout: 120_000 });
   return { ok: true };
 }

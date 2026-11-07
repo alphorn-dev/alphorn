@@ -101,3 +101,21 @@ describe("filter schema metadata", () => {
     expect(FILTER_FIELDS).toEqual(["priority", "tags", "title", "message", "payload"]);
   });
 });
+
+describe("FilterDefinition regex validation", () => {
+  const withRegex = (value: string) => ({
+    groups: [{ conditions: [{ field: "title", operator: "regex", value }] }],
+  });
+
+  it("accepts a valid regex", () => {
+    expect(FilterDefinition.safeParse(withRegex("^deploy (ok|failed)$")).success).toBe(true);
+  });
+
+  it("rejects an uncompilable regex", () => {
+    expect(FilterDefinition.safeParse(withRegex("[invalid")).success).toBe(false);
+  });
+
+  it("rejects lookarounds, which RE2 does not support", () => {
+    expect(FilterDefinition.safeParse(withRegex("foo(?=bar)")).success).toBe(false);
+  });
+});

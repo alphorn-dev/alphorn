@@ -3,6 +3,7 @@ import { logger } from "@/lib/logger";
 import { configureEgressProxy } from "@/lib/http/egress";
 import { APP_VERSION } from "@/lib/version";
 import { startWorker } from "./index";
+import { stopQueue } from "@/lib/queue";
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -26,6 +27,9 @@ logger.info({ component: "worker", mode: "standalone" }, "Starting Alphorn worke
 await startWorker();
 
 async function shutdown() {
+  // Finish in-flight deliveries; a hard exit leaves them PROCESSING until the
+  // 10 min sweep re-sends them (possibly a duplicate).
+  await stopQueue().catch((err) => logger.error({ err }, "Worker shutdown failed"));
   await Sentry.flush(2000).catch(() => {});
   process.exit(0);
 }

@@ -158,9 +158,6 @@ export function SignUpForm({
         <Image src="/logo.svg" alt="Alphorn" width={48} height={48} className="mx-auto mb-2" />
         <CardTitle className="text-2xl font-bold inline-flex items-center justify-center gap-2">
           Create your account
-          <span className="rounded-sm bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-            Beta
-          </span>
         </CardTitle>
         <CardDescription>Get started with Alphorn</CardDescription>
       </CardHeader>

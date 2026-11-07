@@ -26,6 +26,9 @@ case "${MODE:-all}" in
     ;;
   all)
     echo "Starting Alphorn (web + worker)..."
+    # Let instrumentation.node.ts stop the embedded worker gracefully on
+    # SIGTERM instead of Next exiting mid-delivery.
+    export NEXT_MANUAL_SIG_HANDLE=1
     exec node server.js
     ;;
   *)

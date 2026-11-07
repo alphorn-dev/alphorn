@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { compileFilterRegex } from "./regex";
 
 const PriorityCondition = z.object({
   field: z.literal("priority"),
@@ -31,13 +32,20 @@ const PayloadCondition = z.object({
   value: z.string().max(1000),
 });
 
-export const FilterCondition = z.discriminatedUnion("field", [
-  PriorityCondition,
-  TagsCondition,
-  TitleCondition,
-  MessageCondition,
-  PayloadCondition,
-]);
+export const FilterCondition = z
+  .discriminatedUnion("field", [
+    PriorityCondition,
+    TagsCondition,
+    TitleCondition,
+    MessageCondition,
+    PayloadCondition,
+  ])
+  // Reject at save time: an uncompilable pattern would otherwise silently
+  // never match and drop every message for the channel.
+  .refine((c) => c.operator !== "regex" || compileFilterRegex(c.value as string) !== null, {
+    message: "Invalid regex (lookarounds and backreferences are not supported)",
+    path: ["value"],
+  });
 
 export const FilterGroup = z.object({
   // Bounded: every incoming message is evaluated against every filter.

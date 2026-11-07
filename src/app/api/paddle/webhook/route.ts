@@ -272,6 +272,29 @@ async function resolveOrgIdForSubscription(
   return null;
 }
 
+/**
+ * True when the org is already bound to a different Paddle subscription that
+ * still runs (active, or cancelled but not yet past its period end). Events
+ * from a second subscription (double checkout, stale tab) must not overwrite
+ * the live one, or the org flips between plans as each one renews.
+ */
+function belongsToOtherLiveSubscription(
+  existing: {
+    paddleSubscriptionId: string | null;
+    status: string;
+    currentPeriodEnd: Date | null;
+  } | null,
+  subscriptionId: string,
+): boolean {
+  if (!existing?.paddleSubscriptionId || existing.paddleSubscriptionId === subscriptionId) {
+    return false;
+  }
+  const ended =
+    existing.status === "cancelled" &&
+    (!existing.currentPeriodEnd || existing.currentPeriodEnd.getTime() <= Date.now());
+  return !ended;
+}
+
 async function handleSubscriptionUpdate(
   tx: Tx,
   data: SubscriptionNotification,
@@ -325,11 +348,22 @@ async function handleSubscriptionUpdate(
     where: { organizationId },
     select: {
       currentPeriodStart: true,
+      currentPeriodEnd: true,
+      paddleSubscriptionId: true,
       paddleUpdatedAt: true,
       plan: true,
       status: true,
     },
   });
+
+  if (belongsToOtherLiveSubscription(existing, data.id)) {
+    // warn: reaches Sentry, the customer may be paying twice and need a refund.
+    log.warn(
+      { organizationId, subscriptionId: data.id, liveSubscriptionId: existing?.paddleSubscriptionId },
+      "Ignoring event from a second Paddle subscription",
+    );
+    return;
+  }
 
   // Enterprise plans are manual-only and never bound to a Paddle subscription.
   // If a webhook somehow resolves to an enterprise org (e.g. a stray checkout
@@ -475,8 +509,22 @@ async function handleSubscriptionStatus(
   const paddleUpdatedAt = data.updatedAt ? new Date(data.updatedAt) : null;
   const existing = await tx.subscription.findUnique({
     where: { organizationId },
-    select: { paddleUpdatedAt: true, plan: true, status: true },
+    select: {
+      paddleUpdatedAt: true,
+      plan: true,
+      status: true,
+      paddleSubscriptionId: true,
+      currentPeriodEnd: true,
+    },
   });
+
+  if (belongsToOtherLiveSubscription(existing, data.id)) {
+    log.warn(
+      { organizationId, subscriptionId: data.id, liveSubscriptionId: existing?.paddleSubscriptionId, status },
+      "Ignoring status event from a second Paddle subscription",
+    );
+    return;
+  }
 
   if (
     existing?.paddleUpdatedAt &&

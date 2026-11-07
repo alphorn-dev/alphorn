@@ -143,6 +143,7 @@ export default function NewWebhookForm({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Back to webhooks"
           onClick={() => router.push("/webhooks")}
         >
           <ArrowLeft data-icon />

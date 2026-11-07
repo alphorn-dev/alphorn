@@ -141,9 +141,6 @@ export function SignInForm({
         <Image src="/logo.svg" alt="Alphorn" width={48} height={48} className="mx-auto mb-2" />
         <CardTitle className="text-2xl font-bold inline-flex items-center justify-center gap-2">
           Sign in to Alphorn
-          <span className="rounded-sm bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-            Beta
-          </span>
         </CardTitle>
         <CardDescription>
           Enter your credentials to access your account
@@ -206,7 +203,6 @@ export function SignInForm({
               <Label htmlFor="password">Password</Label>
               <Link
                 href="/forgot-password"
-                tabIndex={-1}
                 className="text-xs text-muted-foreground hover:text-primary underline"
               >
                 Forgot password?

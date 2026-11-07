@@ -70,6 +70,8 @@ function wrapLogger(pino: pino.Logger, parentBindings: Bindings = {}): Logger {
 
   for (const level of LEVELS) {
     wrapped[level] = ((objOrMsg: Bindings | string, maybeMsg?: string) => {
+      // Below LOG_LEVEL nothing goes anywhere, Sentry Logs included.
+      if (!pino.isLevelEnabled(level)) return;
       if (typeof objOrMsg === "string") {
         pino[level](objOrMsg);
         toSentry(level, parentBindings, objOrMsg);

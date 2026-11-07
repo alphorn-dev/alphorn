@@ -71,6 +71,7 @@ function KeyValuePairEditor({
             type="button"
             variant="ghost"
             size="icon"
+            aria-label="Remove row"
             onClick={() => removeRow(i)}
             className="shrink-0 text-muted-foreground hover:text-destructive"
           >

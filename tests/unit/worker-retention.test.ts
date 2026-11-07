@@ -2,13 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
-  deleteMany: vi.fn(),
+  executeRaw: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     organization: { findMany: mocks.findMany },
-    message: { deleteMany: mocks.deleteMany },
+    // Tagged template: called as (strings, orgIds, cutoff, batchSize).
+    $executeRaw: mocks.executeRaw,
+    usageCounter: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
   },
 }));
 
@@ -57,16 +59,15 @@ describe("retention sweep", () => {
       { id: "override", subscription: sub({ status: "paused", overrideRetentionDays: 60 }) },
       { id: "no-sub", subscription: null },
     ]);
-    mocks.deleteMany.mockResolvedValue({ count: 0 });
+    mocks.executeRaw.mockResolvedValue(0);
 
     startRetentionSweep();
-    await vi.waitFor(() => expect(mocks.deleteMany).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(mocks.executeRaw).toHaveBeenCalledTimes(3));
 
     const byDays = new Map<number, string[]>();
-    for (const [args] of mocks.deleteMany.mock.calls) {
-      const cutoff: Date = args.where.createdAt.lt;
+    for (const [, orgIds, cutoff] of mocks.executeRaw.mock.calls as [unknown, string[], Date][]) {
       const days = Math.round((now.getTime() - cutoff.getTime()) / DAY_MS);
-      byDays.set(days, args.where.webhook.organizationId.in);
+      byDays.set(days, orgIds);
     }
     expect(byDays.get(30)).toEqual(["active-pro"]);
     expect(byDays.get(7)).toEqual(["paused-pro", "lapsed-pro", "no-sub"]);

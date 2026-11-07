@@ -48,7 +48,15 @@ export async function persistMessageAndEnqueueDeliveries(
       INSERT INTO "Delivery" ("messageId", "channelId", "updatedAt")
       SELECT m."id", c.channel_id, now()
       FROM m CROSS JOIN unnest(${channelIds}::text[]) AS c(channel_id)
-      RETURNING "id"
+      RETURNING "id"    ),
+    -- Quota usage counter (see UsageCounter in schema.prisma). Unreferenced
+    -- data-modifying CTEs still run, in the same statement as the insert.
+    u AS (
+      INSERT INTO "UsageCounter" ("organizationId", "hour", "count")
+      SELECT w."organizationId", date_trunc('hour', now() AT TIME ZONE 'UTC'), 1
+      FROM m JOIN "Webhook" w ON w."id" = ${webhookId}
+      ON CONFLICT ("organizationId", "hour")
+        DO UPDATE SET "count" = "UsageCounter"."count" + 1
     )
     SELECT
       m."id"::text AS "messageId",

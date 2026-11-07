@@ -40,7 +40,7 @@ Self-hostable notification router. Receives webhooks, routes messages to 21+ cha
 - `src/app/api/auth/[...all]`: Better Auth catch-all handler.
 - `src/app/n/[publicId]`: public webhook receiver endpoint.
 - `public/openapi.json`: hand-written spec for the public API (`/n/{publicId}`, `/api/stream/{publicId}`). Changing a status code or adding a public route requires updating it; `tests/unit/openapi.test.ts` fails on drift.
-- `src/lib/filter/`: filter DSL. Zod discriminated unions over conditions (priority, tags, title, message, payload) with regex support via `safe-regex2`.
+- `src/lib/filter/`: filter DSL. Zod discriminated unions over conditions (priority, tags, title, message, payload) with regex support via `re2js` (linear-time RE2, no catastrophic backtracking; lookarounds and backreferences unsupported).
 - `src/lib/webhook-extract/`: extraction of title/message/priority/tags from webhook payloads. Per-webhook `extractMode`: `auto` (known-source formatters, the primary path: one file per source in `sources/<name>.ts`, registered in order in `sources/index.ts`; add new sources there and a case to `tests/unit/webhook-sources/registry.test.ts`), `template` (user-authored templates), `none` (generic heuristic).
 - `src/lib/webhook-loop/`: loop detection (same-host hop counting) to prevent webhook cycles.
 - `src/lib/webhook-cache.ts`: per-instance cache of webhook configs for the hot receiver path. Kept coherent across instances by Postgres triggers that `NOTIFY alphorn_cache_invalidate` (defined in migration SQL), with a 30s TTL as fallback. Writes to cached tables invalidate automatically; do not add a parallel invalidation mechanism.

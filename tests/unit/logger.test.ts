@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   pinoError: vi.fn(),
   pinoFatal: vi.fn(),
   pinoChild: vi.fn(),
+  isLevelEnabled: vi.fn(),
 }));
 
 function makePinoLogger() {
@@ -25,6 +26,7 @@ function makePinoLogger() {
     error: mocks.pinoError,
     fatal: mocks.pinoFatal,
     child: mocks.pinoChild,
+    isLevelEnabled: mocks.isLevelEnabled,
   };
 }
 
@@ -52,6 +54,17 @@ describe("logger", () => {
     vi.resetModules();
     for (const fn of Object.values(mocks)) fn.mockReset();
     mocks.pinoChild.mockImplementation(() => makePinoLogger());
+    mocks.isLevelEnabled.mockReturnValue(true);
+  });
+
+  it("sends nothing to pino or sentry below LOG_LEVEL", async () => {
+    const { logger } = await import("@/lib/logger");
+    mocks.isLevelEnabled.mockImplementation((level: string) => level !== "debug");
+
+    logger.debug({ channelName: "x" }, "Delivery succeeded");
+
+    expect(mocks.pinoDebug).not.toHaveBeenCalled();
+    expect(mocks.sentryDebug).not.toHaveBeenCalled();
   });
 
   it("forwards string logs to pino and sentry with inherited bindings", async () => {

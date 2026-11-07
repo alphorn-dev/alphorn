@@ -57,7 +57,7 @@ Published on [Docker Hub](https://hub.docker.com/r/alphorn/alphorn), mirrored to
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/alphorn-dev/alphorn)
 
-Also available as a [Dokploy](https://dokploy.com) template and as a paste-in [Coolify compose file](./deploy/coolify/alphorn.yaml). See [`deploy/`](./deploy/README.md).
+Compose templates for [Dokploy](./deploy/dokploy/alphorn/) and [Coolify](./deploy/coolify/alphorn.yaml) are in [`deploy/`](./deploy/README.md).
 
 ### Local development
 

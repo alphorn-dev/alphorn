@@ -223,7 +223,6 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    useSecureCookies: process.env.NODE_ENV === "production",
     // The client sets X-Forwarded-For itself, so a single value is only the
     // real client IP when a proxy overwrites the header. With TRUSTED_PROXIES,
     // Better Auth walks the chain from the right and skips those proxies, so a

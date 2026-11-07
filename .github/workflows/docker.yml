@@ -67,6 +67,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Syncs README.md to the Docker Hub page. The token needs the
+      # Read/Write/Delete scope (Read & Write is enough to push, not for this).
+      - name: Update Docker Hub description
+        if: startsWith(github.ref, 'refs/tags/v') && vars.DOCKERHUB_IMAGE != ''
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_IMAGE }}
+          short-description: Self-hostable notification router. Webhooks in, readable alerts to 20+ channels.
+          enable-url-completion: true
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

@@ -503,6 +503,7 @@ export function MessagesTable({
                 <Button
                   variant="outline"
                   size="icon"
+                  aria-label="Previous page"
                   disabled={page <= 1 || isPending}
                   onClick={() => navigate({ page: String(page - 1) })}
                 >
@@ -511,6 +512,7 @@ export function MessagesTable({
                 <Button
                   variant="outline"
                   size="icon"
+                  aria-label="Next page"
                   disabled={page >= totalPages || isPending}
                   onClick={() => navigate({ page: String(page + 1) })}
                 >

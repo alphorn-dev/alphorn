@@ -25,7 +25,7 @@ beforeEach(async () => {
 
 function subscriptionEvent(
   eventType: string,
-  opts: { priceId?: string; status?: string; updatedAt?: string; customData?: object | null } = {},
+  opts: { id?: string; priceId?: string; status?: string; updatedAt?: string; customData?: object | null } = {},
 ) {
   const now = new Date().toISOString();
   return {
@@ -34,7 +34,7 @@ function subscriptionEvent(
     event_type: eventType,
     occurred_at: now,
     data: {
-      id: "sub_test",
+      id: opts.id ?? "sub_test",
       status: opts.status ?? "active",
       customer_id: "ctm_test",
       address_id: "add_test",
@@ -146,5 +146,42 @@ describe("Paddle webhook", () => {
       }),
     );
     expect(await enabledWebhooks()).toBe(3); // free plan limit
+  });
+
+  it("ignores events from a second subscription while the first is still live", async () => {
+    await deliver(subscriptionEvent("subscription.created"));
+    const later = (ms: number) => new Date(Date.now() + ms).toISOString();
+
+    await deliver(
+      subscriptionEvent("subscription.created", { id: "sub_second", priceId: "pri_test_business", updatedAt: later(1000) }),
+    );
+    await deliver(
+      subscriptionEvent("subscription.canceled", { id: "sub_second", status: "canceled", updatedAt: later(2000) }),
+    );
+
+    const sub = await subscription();
+    expect(sub.paddleSubscriptionId).toBe("sub_test");
+    expect(sub.plan).toBe("pro");
+    expect(sub.status).toBe("active");
+  });
+
+  it("accepts a new subscription once the previous one has ended", async () => {
+    await deliver(subscriptionEvent("subscription.created"));
+    await prisma.subscription.update({
+      where: { organizationId: orgId },
+      data: { status: "cancelled", currentPeriodEnd: new Date(Date.now() - 1000) },
+    });
+
+    await deliver(
+      subscriptionEvent("subscription.created", {
+        id: "sub_second",
+        priceId: "pri_test_business",
+        updatedAt: new Date(Date.now() + 1000).toISOString(),
+      }),
+    );
+
+    const sub = await subscription();
+    expect(sub.paddleSubscriptionId).toBe("sub_second");
+    expect(sub.plan).toBe("business");
   });
 });

@@ -46,3 +46,28 @@ export function errorLogFields(err: unknown): Record<string, unknown> {
     ...(e.responseCode !== undefined && { responseCode: e.responseCode }),
   };
 }
+
+/**
+ * Whether a delivery error came from the target (HTTP status, network/SMTP
+ * error code, timeout) rather than from our own code. Those are the project's
+ * problem, shown in the UI and the failure notification, and must not become
+ * Sentry events: one revoked Slack webhook would otherwise file hundreds.
+ */
+export function isExternalDeliveryError(err: unknown): boolean {
+  if (isPermanentChannelError(err)) return true;
+  const e = (err ?? {}) as {
+    name?: unknown;
+    status?: unknown;
+    code?: unknown;
+    responseCode?: unknown;
+    cause?: { code?: unknown };
+  };
+  return (
+    e.status !== undefined ||
+    e.code !== undefined ||
+    e.responseCode !== undefined ||
+    e.cause?.code !== undefined || // undici "fetch failed" (ECONNREFUSED, ENOTFOUND, ...)
+    e.name === "AbortError" ||
+    e.name === "TimeoutError"
+  );
+}

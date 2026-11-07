@@ -134,6 +134,7 @@ model Organization {
   githubInstallations GithubInstallation[]
   settings    OrganizationSettings?
   subscription Subscription?
+  usageCounters UsageCounter[]
 }
 
 model Member {
@@ -361,6 +362,18 @@ model Subscription {
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+}
+
+// Messages received per org per UTC hour. Quota usage is summed from here
+// instead of counting Message rows, which the retention sweep deletes (that
+// would hand the quota back) and which is O(n) on every inbound webhook.
+model UsageCounter {
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hour           DateTime     // start of the UTC hour
+  count          Int          @default(0)
+
+  @@id([organizationId, hour])
 }
 
 model PaddleEvent {

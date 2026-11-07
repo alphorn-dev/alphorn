@@ -112,6 +112,7 @@ function TagsInput({
               {tag}
               <button
                 type="button"
+                aria-label={`Remove tag ${tag}`}
                 onClick={() => removeTag(tag)}
                 className="hover:text-destructive"
               >
@@ -309,6 +310,7 @@ function ConditionRow({
         type="button"
         variant="ghost"
         size="icon-xs"
+        aria-label="Remove condition"
         onClick={onRemove}
         className="text-muted-foreground hover:text-destructive"
       >
