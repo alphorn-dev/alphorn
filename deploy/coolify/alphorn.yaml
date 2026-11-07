@@ -9,7 +9,7 @@
 # Until then: Coolify > New Resource > Docker Compose Empty, paste this file.
 services:
   alphorn:
-    image: ghcr.io/alphorn-dev/alphorn:1.4.0
+    image: ghcr.io/alphorn-dev/alphorn:1.5.0
     environment:
       - SERVICE_URL_ALPHORN_3000
       - BETTER_AUTH_URL=${SERVICE_URL_ALPHORN_3000}
