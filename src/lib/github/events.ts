@@ -31,6 +31,44 @@ export const GITHUB_EVENTS = [
 export type GithubEvent = (typeof GITHUB_EVENTS)[number]["id"];
 export const GITHUB_EVENT_IDS = GITHUB_EVENTS.map((e) => e.id) as [GithubEvent, ...GithubEvent[]];
 
+/**
+ * Actions that become a message, per event. GitHub sends one delivery per action, so one
+ * release arrives as created + published + released, one workflow run as requested +
+ * in_progress + completed. Events not listed here (push, fork, ...) pass unfiltered.
+ * ponytail: allow-list, so actions GitHub adds later are dropped until listed here.
+ */
+const RELEVANT_ACTIONS: Partial<Record<GithubEvent, readonly string[]>> = {
+  release: ["published"],
+  pull_request: ["opened", "closed", "reopened", "ready_for_review"],
+  pull_request_review: ["submitted", "dismissed"],
+  pull_request_review_comment: ["created"],
+  issues: ["opened", "closed", "reopened"],
+  issue_comment: ["created"],
+  discussion: ["created", "answered", "closed", "reopened"],
+  discussion_comment: ["created"],
+  workflow_run: ["completed"],
+  // Assignment changes are dropped; appeared_in_branch repeats an existing alert per branch.
+  secret_scanning_alert: ["created", "reopened", "publicly_leaked", "resolved", "validated"],
+  dependabot_alert: ["created", "reopened", "auto_reopened", "reintroduced", "fixed", "dismissed", "auto_dismissed"],
+  code_scanning_alert: ["created", "reopened", "reopened_by_user", "fixed", "closed_by_user"],
+  star: ["created"],
+};
+
+// deployment_status always has action "created"; the noise is in the state
+// (queued, pending, in_progress, ... before the outcome, inactive when superseded).
+const FINAL_DEPLOYMENT_STATES = ["success", "failure", "error"];
+
+export function isRelevantGithubEvent(
+  event: string,
+  payload: { action?: string; deployment_status?: { state: string } }
+): boolean {
+  if (event === "deployment_status") {
+    return FINAL_DEPLOYMENT_STATES.includes(payload.deployment_status?.state ?? "");
+  }
+  const actions = RELEVANT_ACTIONS[event as GithubEvent];
+  return !actions || actions.includes(payload.action ?? "");
+}
+
 export const DEFAULT_GITHUB_EVENTS: GithubEvent[] = [
   "pull_request",
   "pull_request_review",

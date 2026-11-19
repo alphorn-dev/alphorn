@@ -18,6 +18,8 @@ import {
   exchangeCode,
   githubAppConfig,
   checkInstallationAuthority,
+  installUrl,
+  listAdministeredInstallations,
 } from "@/lib/github/app";
 import { logger as rootLogger } from "@/lib/logger";
 import { assertWebhookLimit } from "@/lib/webhook-limit";
@@ -28,7 +30,8 @@ const CALLBACK_PATH = "/api/github/callback";
 
 interface ConnectState {
   nonce: string;
-  installationId: string;
+  /** Set when GitHub sent us here after an installation; null for "start". */
+  installationId: string | null;
   orgId: string;
 }
 
@@ -51,7 +54,7 @@ function readState(req: NextRequest): ConnectState | null {
     const parsed = JSON.parse(raw) as Partial<ConnectState>;
     if (
       typeof parsed.nonce === "string" &&
-      typeof parsed.installationId === "string" &&
+      (typeof parsed.installationId === "string" || parsed.installationId === null) &&
       typeof parsed.orgId === "string"
     ) {
       return parsed as ConnectState;
@@ -72,12 +75,15 @@ function sameString(a: string, b: string): boolean {
  * Two-step connect flow, both steps on this URL (set it as the App's Setup URL
  * and Callback URL):
  *
- * 1. GitHub redirects here after installation with `installation_id`. That id
- *    is spoofable, so we only remember it (cookie bound to the project and a
- *    nonce) and send the user through OAuth.
- * 2. OAuth returns `code` + `state`. We check the nonce, exchange the code and
- *    ask GitHub whether this user owns the installation (see
- *    checkInstallationAuthority). Only then is it linked to the project.
+ * 1. Either `?start=1` (the Connect button) or `installation_id` (GitHub after
+ *    an installation, or the picker). The id is spoofable, so we only remember
+ *    it (cookie bound to the project and a nonce) and send the user through OAuth.
+ * 2. OAuth returns `code` + `state`. We check the nonce and exchange the code.
+ *    With an installation id we ask GitHub whether this user owns it (see
+ *    checkInstallationAuthority) and only then link it. Without one (start),
+ *    we send the user to the picker with the installations they may connect,
+ *    or straight to installing the App if there are none. Picking one comes
+ *    back here with its installation_id, so the check above always runs.
  */
 export async function GET(req: NextRequest) {
   const config = githubAppConfig();
@@ -101,10 +107,18 @@ export async function GET(req: NextRequest) {
       logger.info({ orgId }, "GitHub connect state mismatch");
       return fail("state");
     }
-    const installationId = BigInt(state.installationId);
-
     const token = await exchangeCode(config, code);
     if (!token) return fail("oauth");
+
+    if (state.installationId === null) {
+      const installations = await listAdministeredInstallations(token);
+      if (installations.length === 0) return redirectTo(installUrl(config));
+      // Ids and logins are only for display: picking one re-runs the verified flow.
+      const picker = new URLSearchParams(installations.map((i) => ["i", `${i.id}:${i.login}`]));
+      return redirectTo(`/webhooks/github?${picker}`);
+    }
+
+    const installationId = BigInt(state.installationId);
     const owner = await checkInstallationAuthority(token, installationId);
     if (!owner.ok) {
       logger.info(
@@ -151,9 +165,11 @@ export async function GET(req: NextRequest) {
       ]);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-        const existing = await prisma.githubInstallation.findUnique({ where: { installationId } });
-        if (existing?.organizationId === orgId) return redirectTo(`/webhooks/${existing.webhookId}`);
-        return fail("linked");
+        // Already linked to this project (connected twice, e.g. in two tabs).
+        const existing = await prisma.githubInstallation.findUniqueOrThrow({
+          where: { installationId_organizationId: { installationId, organizationId: orgId } },
+        });
+        return redirectTo(`/webhooks/${existing.webhookId}`);
       }
       throw err;
     }
@@ -163,14 +179,19 @@ export async function GET(req: NextRequest) {
   }
 
   const installationParam = params.get("installation_id");
-  if (!installationParam || !/^\d{1,19}$/.test(installationParam)) return fail("install");
-
-  // Already linked to this project (e.g. "Redirect on update" after changing repos).
-  const existing = await prisma.githubInstallation.findUnique({
-    where: { installationId: BigInt(installationParam) },
-    select: { organizationId: true, webhookId: true },
-  });
-  if (existing?.organizationId === orgId) return redirectTo(`/webhooks/${existing.webhookId}`);
+  if (installationParam !== null) {
+    if (!/^\d{1,19}$/.test(installationParam)) return fail("install");
+    // Already linked to this project (e.g. "Redirect on update" after changing repos).
+    const existing = await prisma.githubInstallation.findUnique({
+      where: {
+        installationId_organizationId: { installationId: BigInt(installationParam), organizationId: orgId },
+      },
+      select: { webhookId: true },
+    });
+    if (existing) return redirectTo(`/webhooks/${existing.webhookId}`);
+  } else if (params.get("start") !== "1") {
+    return fail("install");
+  }
 
   const nonce = randomBytes(32).toString("base64url");
   const res = NextResponse.redirect(

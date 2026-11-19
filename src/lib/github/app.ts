@@ -82,41 +82,46 @@ interface UserInstallation {
   account: { id: number; login: string; type: string } | null;
 }
 
-// ponytail: 10 pages of 100 installations; a user with more visible installations of this App can't connect.
+// ponytail: 10 pages of 100 installations; installations beyond that are invisible to connect.
 const MAX_INSTALLATION_PAGES = 10;
+
+async function userInstallations(token: string): Promise<UserInstallation[]> {
+  const all: UserInstallation[] = [];
+  for (let page = 1; page <= MAX_INSTALLATION_PAGES; page++) {
+    const data = await githubJson<{ installations: UserInstallation[] }>(
+      token,
+      `/user/installations?per_page=100&page=${page}`,
+    );
+    all.push(...data.installations);
+    if (data.installations.length < 100) break;
+  }
+  return all;
+}
 
 export type InstallationAuthority =
   | { ok: true; login: string }
   | { ok: false; reason: "access" | "org-admin" };
 
 /**
- * Whether the token's user may connect the whole installation. The
- * installation_id GitHub appends to the setup URL is a plain, spoofable query
- * param, so it is never trusted without this check. Seeing the installation is
- * not enough: any collaborator with read access to one of its repositories
- * sees it, and linking would route events of every repository in it. So a
- * user-account installation must belong to this user, and an organization
- * installation needs an active organization owner (role admin).
+ * Whether the token's user may connect the whole installation. Seeing an
+ * installation is not enough: any collaborator with read access to one of its
+ * repositories sees it, and linking would route events of every repository in
+ * it. So a user-account installation must belong to this user, and an
+ * organization installation needs an active organization owner (role admin).
+ * `myUserId` is fetched lazily, once per token.
  */
-export async function checkInstallationAuthority(
+async function authorityOver(
   token: string,
-  installationId: bigint,
+  installation: UserInstallation | undefined,
+  myUserId: () => Promise<number>,
 ): Promise<InstallationAuthority> {
-  let installation: UserInstallation | undefined;
-  for (let page = 1; page <= MAX_INSTALLATION_PAGES && !installation; page++) {
-    const data = await githubJson<{ installations: UserInstallation[] }>(
-      token,
-      `/user/installations?per_page=100&page=${page}`,
-    );
-    installation = data.installations.find((i) => BigInt(i.id) === installationId);
-    if (data.installations.length < 100) break;
-  }
   const account = installation?.account;
   if (!account) return { ok: false, reason: "access" };
 
   if (account.type === "User") {
-    const user = await githubJson<{ id: number }>(token, "/user");
-    return user.id === account.id ? { ok: true, login: account.login } : { ok: false, reason: "access" };
+    return (await myUserId()) === account.id
+      ? { ok: true, login: account.login }
+      : { ok: false, reason: "access" };
   }
 
   // Enterprise and other account types can't be checked here: reject them.
@@ -129,4 +134,35 @@ export async function checkInstallationAuthority(
   return membership.state === "active" && membership.role === "admin"
     ? { ok: true, login: account.login }
     : { ok: false, reason: "org-admin" };
+}
+
+function lazyUserId(token: string): () => Promise<number> {
+  let id: Promise<number> | undefined;
+  return () => (id ??= githubJson<{ id: number }>(token, "/user").then((u) => u.id));
+}
+
+/**
+ * Checks one installation. The installation_id GitHub appends to the setup URL
+ * (and the one the picker links to) is a plain, spoofable query param, so it
+ * is never trusted without this check.
+ */
+export async function checkInstallationAuthority(
+  token: string,
+  installationId: bigint,
+): Promise<InstallationAuthority> {
+  const installation = (await userInstallations(token)).find((i) => BigInt(i.id) === installationId);
+  return authorityOver(token, installation, lazyUserId(token));
+}
+
+/** Installations of this App the token's user may connect, for the picker. */
+export async function listAdministeredInstallations(
+  token: string,
+): Promise<{ id: string; login: string }[]> {
+  const myUserId = lazyUserId(token);
+  const result: { id: string; login: string }[] = [];
+  for (const installation of await userInstallations(token)) {
+    const authority = await authorityOver(token, installation, myUserId);
+    if (authority.ok) result.push({ id: String(installation.id), login: authority.login });
+  }
+  return result;
 }

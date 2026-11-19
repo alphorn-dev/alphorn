@@ -73,6 +73,7 @@ export function WebhookGithub({
         <CardDescription>
           Events from the repositories selected in the GitHub App installation
           arrive here automatically. Choose which events become messages.
+          Intermediate steps (edits, labels, in-progress runs) are skipped.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

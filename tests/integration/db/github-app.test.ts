@@ -31,19 +31,28 @@ function stubGithub({
   account = ME as Account,
   visible = true,
   orgRole = "admin",
-}: { token?: string | null; account?: Account; visible?: boolean; orgRole?: string } = {}) {
+  installations: listed,
+}: {
+  token?: string | null;
+  account?: Account;
+  visible?: boolean;
+  orgRole?: string | Record<string, string>;
+  /** Overrides the single visible installation (currentInstallation, account). */
+  installations?: { id: number; account: Account }[];
+} = {}) {
   const fetchMock = vi.fn(async (input: string | URL | Request) => {
     const url = new URL(String(input));
     if (url.href === "https://github.com/login/oauth/access_token") {
       return Response.json(token ? { access_token: token } : { error: "bad_verification_code" });
     }
     if (url.pathname === "/user/installations") {
-      const installations = visible ? [{ id: Number(currentInstallation), account }] : [];
+      const installations = listed ?? (visible ? [{ id: Number(currentInstallation), account }] : []);
       return Response.json({ total_count: installations.length, installations });
     }
     if (url.pathname === "/user") return Response.json({ id: ME.id, login: ME.login });
-    if (url.pathname === `/user/memberships/orgs/${account.login}`) {
-      return Response.json({ state: "active", role: orgRole });
+    const org = url.pathname.match(/^\/user\/memberships\/orgs\/(.+)$/)?.[1];
+    if (org) {
+      return Response.json({ state: "active", role: typeof orgRole === "string" ? orgRole : orgRole[org] });
     }
     throw new Error(`unexpected fetch ${url}`);
   });
@@ -121,7 +130,7 @@ describe("GitHub connect callback", () => {
     const res = await finishConnect(cookie, nonce);
 
     expect(res.headers.get("location")).toMatch(/^https:\/\/app\.test\/webhooks\/wh_.+\?github=connected$/);
-    const link = await prisma.githubInstallation.findUniqueOrThrow({
+    const link = await prisma.githubInstallation.findFirstOrThrow({
       where: { installationId: BigInt(4711) },
       include: { webhook: true },
     });
@@ -159,7 +168,7 @@ describe("GitHub connect callback", () => {
     const owner = await startConnect("4711");
     const res = await finishConnect(owner.cookie, owner.nonce);
     expect(res.headers.get("location")).toContain("?github=connected");
-    const link = await prisma.githubInstallation.findUniqueOrThrow({
+    const link = await prisma.githubInstallation.findFirstOrThrow({
       where: { installationId: BigInt(4711) },
       include: { webhook: true },
     });
@@ -177,18 +186,64 @@ describe("GitHub connect callback", () => {
     expect(await prisma.githubInstallation.count()).toBe(0);
   });
 
-  it("refuses an installation already linked to another project", async () => {
+  it("links one installation to several projects, but only once per project", async () => {
     stubGithub();
     const first = await startConnect("4711");
     await finishConnect(first.cookie, first.nonce);
+    const firstOrg = auth.orgId;
 
     auth.orgId = await newOrg();
     const second = await startConnect("4711");
     const res = await finishConnect(second.cookie, second.nonce);
+    expect(res.headers.get("location")).toContain("?github=connected");
 
-    expect(errorCode(res)).toBe("linked");
-    expect(await prisma.githubInstallation.count()).toBe(1);
-    expect(await prisma.webhook.count({ where: { organizationId: auth.orgId } })).toBe(0);
+    // Connecting the same installation again leads to the existing webhook.
+    const link = await prisma.githubInstallation.findFirstOrThrow({ where: { organizationId: auth.orgId } });
+    const again = await callback(new NextRequest("https://app.test/api/github/callback?installation_id=4711"));
+    expect(again.headers.get("location")).toBe(`https://app.test/webhooks/${link.webhookId}`);
+
+    const links = await prisma.githubInstallation.findMany({ where: { installationId: BigInt(4711) } });
+    expect(links.map((l) => l.organizationId).sort()).toEqual([firstOrg, auth.orgId].sort());
+  });
+
+  it("connecting twice in parallel tabs links once and leads to the existing webhook", async () => {
+    stubGithub();
+    const tab1 = await startConnect("4711");
+    const tab2 = await startConnect("4711");
+    await finishConnect(tab1.cookie, tab1.nonce);
+    const link = await prisma.githubInstallation.findFirstOrThrow({ where: { organizationId: auth.orgId } });
+
+    const res = await finishConnect(tab2.cookie, tab2.nonce);
+    expect(res.headers.get("location")).toBe(`https://app.test/webhooks/${link.webhookId}`);
+    expect(await prisma.webhook.count({ where: { organizationId: auth.orgId } })).toBe(1);
+  });
+
+  it("from the Connect button, offers the installations the user may connect", async () => {
+    stubGithub({
+      installations: [
+        { id: 10, account: ME },
+        { id: 11, account: { id: 2, login: "someone-else", type: "User" } },
+        { id: 12, account: { id: 50, login: "acme", type: "Organization" } },
+        { id: 13, account: { id: 51, login: "member-only", type: "Organization" } },
+      ],
+      orgRole: { acme: "admin", "member-only": "member" },
+    });
+    const start = await callback(new NextRequest("https://app.test/api/github/callback?start=1"));
+    const nonce = new URL(start.headers.get("location")!).searchParams.get("state")!;
+    const res = await finishConnect(start.cookies.get(COOKIE)!.value, nonce);
+
+    const location = new URL(res.headers.get("location")!);
+    expect(location.pathname).toBe("/webhooks/github");
+    expect(location.searchParams.getAll("i")).toEqual(["10:hans", "12:acme"]);
+    expect(await prisma.githubInstallation.count()).toBe(0);
+  });
+
+  it("from the Connect button, sends a user without installations to install the App", async () => {
+    stubGithub({ visible: false });
+    const start = await callback(new NextRequest("https://app.test/api/github/callback?start=1"));
+    const nonce = new URL(start.headers.get("location")!).searchParams.get("state")!;
+    const res = await finishConnect(start.cookies.get(COOKIE)!.value, nonce);
+    expect(res.headers.get("location")).toBe("https://github.com/apps/alphorn-test/installations/new");
   });
 
   it("rejects a malformed installation_id", async () => {
@@ -203,7 +258,9 @@ describe("GitHub webhook endpoint", () => {
     const { cookie, nonce } = await startConnect(String(installationId));
     await finishConnect(cookie, nonce);
     vi.unstubAllGlobals();
-    return prisma.githubInstallation.findUniqueOrThrow({ where: { installationId: BigInt(installationId) } });
+    return prisma.githubInstallation.findFirstOrThrow({
+      where: { installationId: BigInt(installationId), organizationId: auth.orgId },
+    });
   }
 
   it("routes a selected event to the linked project's webhook", async () => {
@@ -250,6 +307,27 @@ describe("GitHub webhook endpoint", () => {
     const res = await deliver("pull_request", prOpened(999));
     expect(res.status).toBe(202);
     expect(await prisma.message.count()).toBe(0);
+  });
+
+  it("delivers to every project that linked the installation and selected the event", async () => {
+    const a = await connected(105);
+    auth.orgId = await newOrg();
+    const b = await connected(105);
+    auth.orgId = await newOrg();
+    const c = await connected(105);
+    await prisma.githubInstallation.update({ where: { id: c.id }, data: { events: ["push"] } });
+
+    const res = await deliver("pull_request", prOpened(105));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ delivered: 2 });
+    for (const link of [a, b]) {
+      expect(await prisma.message.count({ where: { webhookId: link.webhookId } })).toBe(1);
+    }
+    expect(await prisma.message.count({ where: { webhookId: c.webhookId } })).toBe(0);
+
+    await deliver("installation", { action: "deleted", installation: { id: 105 } });
+    expect(await prisma.githubInstallation.count({ where: { installationId: BigInt(105) } })).toBe(0);
+    expect(await prisma.webhook.count({ where: { id: { in: [a, b, c].map((l) => l.webhookId) }, deletedAt: null } })).toBe(0);
   });
 
   it("stops delivering while suspended and removes the webhook on uninstall", async () => {

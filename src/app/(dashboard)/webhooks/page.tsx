@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ChevronDown, GitPullRequest, SquarePen, Webhook } from "lucide-react";
 import { formatDate } from "@/lib/format-date";
-import { githubAppConfig, installUrl } from "@/lib/github/app";
+import { githubAppConfig } from "@/lib/github/app";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,7 +38,6 @@ const GITHUB_ERRORS: Record<string, string> = {
   access: "Your GitHub account doesn't own that installation.",
   "org-admin": "Only owners of the GitHub organization can connect its installation.",
   limit: "Webhook limit reached. Upgrade your plan or delete a webhook to connect GitHub.",
-  linked: "This GitHub installation is already connected to another project.",
   install: "Missing or invalid GitHub installation. Please try again.",
 };
 
@@ -116,7 +115,7 @@ export default async function WebhooksPage({
                   <DropdownMenuGroup>
                     <DropdownMenuLabel>From an app</DropdownMenuLabel>
                     <DropdownMenuItem
-                      render={<a href={installUrl(githubConfig)} />}
+                      render={<a href="/api/github/callback?start=1" />}
                       className="items-start"
                     >
                       <GitPullRequest className="mt-0.5" />

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { githubAppConfig, verifyGithubSignature } from "@/lib/github/app";
+import { isRelevantGithubEvent } from "@/lib/github/events";
 import { ingestWebhook } from "@/lib/ingest";
 import { logger as rootLogger } from "@/lib/logger";
 import { getCachedWebhook } from "@/lib/webhook-cache";
@@ -16,6 +17,7 @@ const logger = rootLogger.child({ component: "github-webhook" });
 const envelopeSchema = z.object({
   action: z.string().optional(),
   installation: z.object({ id: z.number().int().positive() }).optional(),
+  deployment_status: z.object({ state: z.string() }).optional(),
 });
 
 const ignored = (reason: string) => NextResponse.json({ ignored: reason }, { status: 202 });
@@ -28,7 +30,10 @@ function withoutSecretValue(rawBody: string): string {
   return JSON.stringify(body);
 }
 
-/** Receives every event of every installation of the GitHub App and routes it by installation id. */
+/**
+ * Receives every event of every installation of the GitHub App and routes it
+ * by installation id to every project that linked it.
+ */
 export async function POST(req: Request) {
   const config = githubAppConfig();
   if (!config) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -65,17 +70,18 @@ export async function POST(req: Request) {
 
   if (event === "installation") {
     if (envelope.action === "deleted") {
-      const link = await prisma.githubInstallation.findUnique({ where: { installationId } });
-      if (link) {
-        // Soft-delete keeps the webhook's message history, like deleting it in the UI.
+      const links = await prisma.githubInstallation.findMany({ where: { installationId } });
+      if (links.length > 0) {
+        const webhookIds = links.map((l) => l.webhookId);
+        // Soft-delete keeps the webhooks' message history, like deleting them in the UI.
         await prisma.$transaction([
-          prisma.githubInstallation.delete({ where: { id: link.id } }),
-          prisma.webhook.update({
-            where: { id: link.webhookId },
+          prisma.githubInstallation.deleteMany({ where: { installationId } }),
+          prisma.webhook.updateMany({
+            where: { id: { in: webhookIds } },
             data: { deletedAt: new Date(), enabled: false },
           }),
         ]);
-        log.info({ webhookId: link.webhookId }, "GitHub App uninstalled, webhook removed");
+        log.info({ webhookIds }, "GitHub App uninstalled, webhooks removed");
       }
     } else if (envelope.action === "suspend" || envelope.action === "unsuspend") {
       await prisma.githubInstallation.updateMany({
@@ -86,24 +92,28 @@ export async function POST(req: Request) {
     return ignored("installation lifecycle");
   }
 
+  if (!isRelevantGithubEvent(event, envelope)) return ignored("action not relevant");
+
   // ponytail: one indexed lookup per event; cache it alongside webhook-cache if GitHub traffic gets hot.
-  const link = await prisma.githubInstallation.findUnique({
-    where: { installationId },
-    select: { events: true, suspendedAt: true, webhook: { select: { publicId: true } } },
+  const links = await prisma.githubInstallation.findMany({
+    where: { installationId, suspendedAt: null, events: { has: event } },
+    select: { webhook: { select: { publicId: true } } },
   });
-  if (!link) return ignored("unknown installation");
-  if (link.suspendedAt) return ignored("installation suspended");
-  // Dropped before ingestWebhook, so unselected events never count against the quota.
-  if (!link.events.includes(event)) return ignored("event not selected");
+  // Unselected events are dropped before ingestWebhook, so they never count against the quota.
+  if (links.length === 0) return ignored("no project selected this event");
 
-  const webhook = await getCachedWebhook(link.webhook.publicId);
-  if (!webhook || !webhook.enabled) return ignored("webhook disabled");
-
-  return ingestWebhook({
-    webhook,
-    req,
-    logger: log.child({ webhookId: webhook.id }),
-    trace: [webhook.publicId],
-    rawBody: event.startsWith("secret_scanning") ? withoutSecretValue(rawBody) : rawBody,
-  });
+  const body = event.startsWith("secret_scanning") ? withoutSecretValue(rawBody) : rawBody;
+  let delivered = 0;
+  // ponytail: sequential, one ingest per linked project; parallelize if installations get many projects.
+  for (const link of links) {
+    const webhook = await getCachedWebhook(link.webhook.publicId);
+    if (!webhook || !webhook.enabled) continue;
+    const webhookLog = log.child({ webhookId: webhook.id });
+    const res = await ingestWebhook({ webhook, req, logger: webhookLog, trace: [webhook.publicId], rawBody: body });
+    // One project's quota or rate limit must neither fail delivery for the others
+    // nor make GitHub show the delivery as failed.
+    if (res.ok) delivered++;
+    else webhookLog.info({ status: res.status }, "GitHub event not ingested for project");
+  }
+  return delivered > 0 ? NextResponse.json({ delivered }, { status: 201 }) : ignored("not ingested");
 }

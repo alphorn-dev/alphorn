@@ -279,7 +279,7 @@ export async function deleteWebhook(id: string) {
   // Soft-delete: tombstone the row so Messages/Deliveries retain history.
   // The Webhook UPDATE trigger flushes the receiver cache (/n/:publicId -> 404).
   // A GitHub connection is unlinked too, so the installation can be
-  // connected again (its installationId is unique).
+  // connected to this project again (one link per installation and project).
   await prisma.$transaction([
     prisma.githubInstallation.deleteMany({ where: { webhookId: id } }),
     prisma.webhook.update({
