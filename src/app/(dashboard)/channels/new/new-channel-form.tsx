@@ -20,7 +20,7 @@ const CATEGORIES: Record<string, string[]> = {
   "Incident Management": ["pagerduty", "opsgenie"],
   "Email": ["smtp", "sendgrid", "mailgun"],
   "SMS": ["twilio-sms", "vonage-sms"],
-  "Other": ["webhook", "sse"],
+  "Other": ["webhook", "forward", "sse"],
 };
 
 export default function NewChannelForm({ appUrl }: { appUrl: string }) {
