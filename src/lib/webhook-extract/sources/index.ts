@@ -7,6 +7,8 @@ import { azureMonitorSource } from "./azure-monitor";
 import { betterStackSource } from "./better-stack";
 import { bitbucketSource } from "./bitbucket";
 import { circleciSource } from "./circleci";
+import { cloudflareSource } from "./cloudflare";
+import { datadogSource } from "./datadog";
 import { dockerHubSource } from "./docker-hub";
 import { gcpMonitoringSource } from "./gcp-monitoring";
 import { giteaSource } from "./gitea";
@@ -67,6 +69,8 @@ export const SOURCES: AutoSource[] = [
   betterStackSource,
   graylogSource,
   jenkinsSource,
+  datadogSource,
+  cloudflareSource,
   grafanaSource,
   alertmanagerSource,
 ];

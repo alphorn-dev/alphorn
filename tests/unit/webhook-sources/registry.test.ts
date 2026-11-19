@@ -37,6 +37,8 @@ const CASES: Case[] = [
   ["better-stack", { data: { type: "incident", attributes: { name: "api", cause: "Timeout", started_at: "2026-01-01T00:00:00Z" } } }],
   ["graylog", { event_definition_id: "abc123", event_definition_title: "Errors", event: { message: "x", priority: 3 } }],
   ["jenkins", { name: "build", build: { number: 7, phase: "COMPLETED", status: "FAILURE" } }],
+  ["datadog", { id: "1", title: "[Triggered] CPU", body: "high", event_type: "query_alert_monitor", last_updated: "1794650100000", org: { id: "1", name: "Acme" } }],
+  ["cloudflare", { name: "Origin health", policy_name: "Origin health", text: "Unhealthy", ts: 1794650100, alert_event: "ALERT_STATE_EVENT_START" }],
   ["grafana", { orgId: 1, status: "firing", groupKey: "k", alerts: [] }],
   ["alertmanager", { status: "firing", groupKey: "k", alerts: [] }],
 ];
