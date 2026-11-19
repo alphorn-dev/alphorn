@@ -198,16 +198,9 @@ export function SignInForm({
               disabled={loading}
             />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-xs text-muted-foreground hover:text-primary underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+          {/* Input sits before the link in the DOM so Tab goes email -> password -> forgot link; order-last keeps it visually below. */}
+          <div className="flex flex-wrap items-center justify-between gap-y-2">
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               type="password"
@@ -216,7 +209,14 @@ export function SignInForm({
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
+              className="order-last basis-full"
             />
+            <Link
+              href="/forgot-password"
+              className="text-xs text-muted-foreground hover:text-primary underline"
+            >
+              Forgot password?
+            </Link>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
