@@ -3,6 +3,7 @@ import type { MessageFilters } from "./actions";
 import { SendMessageDialog } from "./send-message-dialog";
 import { MessagesTable } from "./messages-table";
 import { getMemberRole } from "@/lib/auth/server";
+import { getChannelsForOrg } from "../channels/actions";
 
 export default async function MessagesPage({
   searchParams,
@@ -10,10 +11,11 @@ export default async function MessagesPage({
   searchParams: Promise<MessageFilters>;
 }) {
   const params = await searchParams;
-  const [result, allTags, webhooks, role] = await Promise.all([
+  const [result, allTags, webhooks, channels, role] = await Promise.all([
     getMessagesForOrg(params),
     getAllTagsForOrg(),
     getWebhooksForSend(),
+    getChannelsForOrg(),
     getMemberRole(),
   ]);
   const isAdminOrOwner = role === "owner" || role === "admin";
@@ -37,6 +39,7 @@ export default async function MessagesPage({
         pageSize={result.pageSize}
         allTags={allTags}
         webhooks={webhooks}
+        channels={channels.map((c) => ({ id: c.id, name: c.name }))}
         filters={params}
       />
     </div>

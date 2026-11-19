@@ -1,4 +1,9 @@
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+
+/** e.g. "5 minutes ago" - compact age for list rows; pair with formatDateTime on hover. */
+export function formatRelativeTime(date: Date | string): string {
+  return formatDistanceToNow(new Date(date), { addSuffix: true });
+}
 
 /** e.g. "Jan 5, 2026, 3:45 PM" - full date and time for detail views. */
 export function formatDateTime(date: Date | string): string {

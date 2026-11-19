@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { BreadcrumbProvider, Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function DashboardLayout({
@@ -33,6 +33,7 @@ export default async function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
+        <BreadcrumbProvider>
         <header className="flex h-12 items-center gap-3 border-b px-6">
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-4" />
@@ -44,6 +45,7 @@ export default async function DashboardLayout({
         <main className="flex-1 p-6">
           <div className="mx-auto max-w-6xl">{children}</div>
         </main>
+        </BreadcrumbProvider>
       </SidebarInset>
     </SidebarProvider>
   );

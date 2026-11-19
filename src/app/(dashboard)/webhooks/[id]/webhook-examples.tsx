@@ -8,12 +8,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CopyButton } from "@/components/copy-button";
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 text-sm">
-      {children}
-    </pre>
+    <div className="relative">
+      <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 pr-12 text-sm">
+        {children}
+      </pre>
+      <CopyButton
+        value={children}
+        label="Copy code"
+        variant="ghost"
+        size="icon-sm"
+        className="absolute top-2 right-2 bg-background/80"
+      />
+    </div>
   );
 }
 

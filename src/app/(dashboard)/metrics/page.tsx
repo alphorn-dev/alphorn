@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { getMetrics } from "./actions";
+import { cn } from "@/lib/utils";
 import { MetricsTabs } from "./metrics-tabs";
 import {
   Card,
@@ -9,15 +11,48 @@ import {
 import { Mail, Percent, CheckCircle2, XCircle, Timer, RotateCw, Layers } from "lucide-react";
 import { formatLatency } from "@/lib/format-date";
 
-export default async function MetricsPage() {
-  const metrics = await getMetrics(30);
+const PERIODS = [
+  { days: 1, label: "24h", description: "the last 24 hours" },
+  { days: 7, label: "7d", description: "the last 7 days" },
+  { days: 30, label: "30d", description: "the last 30 days" },
+  { days: 90, label: "90d", description: "the last 90 days" },
+];
+const DEFAULT_DAYS = 30;
+
+export default async function MetricsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>;
+}) {
+  const { days } = await searchParams;
+  const period = PERIODS.find((p) => String(p.days) === days) ?? PERIODS.find((p) => p.days === DEFAULT_DAYS)!;
+  const metrics = await getMetrics(period.days);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Metrics</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Notification activity over the last 30 days.
-      </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Metrics</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Notification activity over {period.description}.
+          </p>
+        </div>
+        <nav aria-label="Time period" className="inline-flex rounded-lg bg-muted p-0.5">
+          {PERIODS.map((p) => (
+            <Link
+              key={p.days}
+              href={p.days === DEFAULT_DAYS ? "/metrics" : `/metrics?days=${p.days}`}
+              aria-current={p === period ? "page" : undefined}
+              className={cn(
+                "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+                p === period && "bg-background text-foreground shadow-sm",
+              )}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

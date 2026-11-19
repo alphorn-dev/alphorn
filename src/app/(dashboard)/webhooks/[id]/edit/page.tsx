@@ -4,6 +4,7 @@ import { getWebhookById } from "../../actions";
 import { getChannelsForOrg } from "../../../channels/actions";
 import { getAllTagsForOrg } from "../../../messages/actions";
 import EditWebhookForm from "./edit-webhook-form";
+import { BreadcrumbLabel } from "@/components/breadcrumbs";
 
 export default async function EditWebhookPage({
   params,
@@ -25,10 +26,13 @@ export default async function EditWebhookPage({
   }
 
   return (
-    <EditWebhookForm
-      webhook={webhook}
-      channels={channels.map((c) => ({ id: c.id, name: c.name, type: c.type }))}
-      availableTags={tags}
-    />
+    <>
+      <BreadcrumbLabel segment={webhook.id} label={webhook.name} />
+      <EditWebhookForm
+        webhook={webhook}
+        channels={channels.map((c) => ({ id: c.id, name: c.name, type: c.type }))}
+        availableTags={tags}
+      />
+    </>
   );
 }

@@ -79,6 +79,9 @@ export async function getWebhooksForOrg() {
       name: true,
       enabled: true,
       createdAt: true,
+      // The endpoint URL is already shown to every member on the detail page.
+      publicId: true,
+      githubInstallation: { select: { installationId: true } },
       channels: {
         select: {
           channelId: true,
@@ -182,7 +185,7 @@ export async function createWebhook(data: {
   revalidatePath("/webhooks");
   // Return the plaintext key once - it is never recoverable from the DB after
   // this. The caller shows it to the user and discards it.
-  return { id: webhook.id, apiKey };
+  return { id: webhook.id, apiKey, publicId: webhook.publicId };
 }
 
 export async function updateWebhook(

@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
-import { ShieldCheck, ShieldOff, Copy, RefreshCw } from "lucide-react";
+import { ShieldCheck, ShieldOff, RefreshCw } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 
 const QRCodeSVG = dynamic(
   () => import("qrcode.react").then((mod) => ({ default: mod.QRCodeSVG })),
@@ -212,11 +213,6 @@ export function AuthenticatorAppSection({ userHasPassword }: { userHasPassword: 
     }
   }
 
-  async function copyBackupCodes() {
-    await navigator.clipboard.writeText(backupCodes.join("\n"));
-    toast.success("Backup codes copied to clipboard");
-  }
-
   // Extract the secret from totpURI for manual entry
   const totpSecret = (() => {
     try {
@@ -255,10 +251,14 @@ export function AuthenticatorAppSection({ userHasPassword }: { userHasPassword: 
           <span key={code}>{code}</span>
         ))}
       </div>
-      <Button variant="outline" size="sm" onClick={copyBackupCodes}>
-        <Copy className="mr-2 h-4 w-4" />
+      <CopyButton
+        value={backupCodes.join("\n")}
+        label="Copy codes"
+        toastMessage="Backup codes copied to clipboard"
+        className="w-fit"
+      >
         Copy codes
-      </Button>
+      </CopyButton>
     </>
   );
 
@@ -325,8 +325,9 @@ export function AuthenticatorAppSection({ userHasPassword }: { userHasPassword: 
                 <summary className="cursor-pointer text-sm text-muted-foreground">
                   Can&apos;t scan? Enter the key manually
                 </summary>
-                <div className="mt-2 rounded-md bg-muted p-3 font-mono text-sm break-all select-all">
-                  {totpSecret}
+                <div className="mt-2 flex items-start gap-2 rounded-md bg-muted p-3">
+                  <span className="min-w-0 flex-1 font-mono text-sm break-all select-all">{totpSecret}</span>
+                  <CopyButton value={totpSecret} label="Copy key" toastMessage="Key copied" variant="ghost" size="icon-sm" />
                 </div>
               </details>
             )}

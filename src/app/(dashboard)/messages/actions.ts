@@ -11,6 +11,7 @@ import { evaluateFilter } from "@/lib/filter";
 import type { FilterDefinition } from "@/lib/filter/schema";
 import { persistMessageAndEnqueueDeliveries } from "@/lib/delivery";
 import { isWithinRetryWindow } from "@/worker/deliver";
+import { messageOrderBy, parsePageSize } from "./query";
 import {
   checkMessageQuotaForSubscription,
   getOrCreateSubscription,
@@ -22,17 +23,20 @@ export interface MessageFilters {
   status?: string;
   priority?: string;
   webhook?: string;
+  channel?: string;
   from?: string;
   to?: string;
   page?: string;
+  /** "<column>.<asc|desc>", column one of MESSAGE_SORT_COLUMNS. */
+  sort?: string;
+  size?: string;
 }
-
-const PAGE_SIZE = 25;
 
 export async function getMessagesForOrg(filters: MessageFilters = {}) {
   const session = await requireSession();
   const orgId = session.session.activeOrganizationId;
-  if (!orgId) return { messages: [], total: 0, page: 1, pageSize: PAGE_SIZE };
+  const pageSize = parsePageSize(filters.size);
+  if (!orgId) return { messages: [], total: 0, page: 1, pageSize };
 
   // Capped so a crafted ?page= cannot force a huge OFFSET scan.
   const page = Math.min(10_000, Math.max(1, parseInt(filters.page ?? "1", 10) || 1));
@@ -78,9 +82,15 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
     }
   }
 
-  if (filters.status) {
-    const statuses = filters.status.split(",");
-    where.deliveries = { some: { status: { in: statuses as DeliveryStatus[] } } };
+  // Status and channel narrow the same delivery: "failed on Slack" means a
+  // Slack delivery that failed, not any failure plus any Slack delivery.
+  if (filters.status || filters.channel) {
+    where.deliveries = {
+      some: {
+        ...(filters.status ? { status: { in: filters.status.split(",") as DeliveryStatus[] } } : {}),
+        ...(filters.channel ? { channelId: { in: filters.channel.split(",") } } : {}),
+      },
+    };
   }
 
   const [messages, total] = await Promise.all([
@@ -95,7 +105,7 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
         priority: true,
         tags: true,
         createdAt: true,
-        webhook: { select: { name: true } },
+        webhook: { select: { id: true, name: true, deletedAt: true } },
         deliveries: {
           select: {
             id: true,
@@ -104,14 +114,14 @@ export async function getMessagesForOrg(filters: MessageFilters = {}) {
           },
         },
       },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
+      orderBy: messageOrderBy(filters.sort),
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.message.count({ where }),
   ]);
 
-  return { messages, total, page, pageSize: PAGE_SIZE };
+  return { messages, total, page, pageSize };
 }
 
 // The tag filter only needs recently-seen tags, so bound the DISTINCT unnest to
@@ -146,7 +156,7 @@ export async function getMessageById(id: string) {
       webhook: { organizationId: orgId },
     },
     include: {
-      webhook: { select: { name: true } },
+      webhook: { select: { id: true, name: true, deletedAt: true } },
       deliveries: {
         include: { channel: { select: { id: true, name: true, type: true } } },
         orderBy: { createdAt: "desc" },
@@ -184,6 +194,32 @@ export async function resendDelivery(deliveryId: string) {
   await queue.send(DELIVERY_QUEUE, { deliveryId });
 }
 
+/** Re-queues every FAILED/STALE delivery of a message still inside the retry window. */
+export async function resendFailedDeliveries(messageId: string): Promise<number> {
+  const { orgId } = await requireAdminOrOwner();
+
+  const failed = await prisma.delivery.findMany({
+    where: {
+      messageId,
+      channel: { organizationId: orgId },
+      status: { in: ["FAILED", "STALE"] },
+    },
+    select: { id: true, createdAt: true },
+  });
+  // Same window as resendDelivery: the worker skips older rows.
+  const ids = failed.filter((d) => isWithinRetryWindow(d.createdAt)).map((d) => d.id);
+  if (ids.length === 0) throw new Error("No failed deliveries can be resent");
+
+  await prisma.delivery.updateMany({
+    where: { id: { in: ids }, status: { in: ["FAILED", "STALE"] } },
+    data: { status: "PENDING", lastError: null },
+  });
+
+  const queue = await getQueue();
+  await Promise.all(ids.map((deliveryId) => queue.send(DELIVERY_QUEUE, { deliveryId })));
+  return ids.length;
+}
+
 export async function getMessageDeliveries(messageId: string) {
   const session = await requireSession();
   const orgId = session.session.activeOrganizationId;
@@ -196,6 +232,31 @@ export async function getMessageDeliveries(messageId: string) {
     },
     include: { channel: { select: { id: true, name: true, type: true } } },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+// Same columns as the dashboard's recent-messages card.
+const recentMessageSelect = {
+  id: true,
+  title: true,
+  createdAt: true,
+  webhook: { select: { id: true, name: true, deletedAt: true } },
+  deliveries: {
+    select: {
+      id: true,
+      status: true,
+      channel: { select: { id: true, name: true, type: true } },
+    },
+  },
+} satisfies Prisma.MessageSelect;
+
+export async function getRecentMessagesForWebhook(webhookId: string) {
+  const { orgId } = await requireOrgSession();
+  return prisma.message.findMany({
+    where: { webhookId, webhook: { organizationId: orgId } },
+    select: recentMessageSelect,
+    orderBy: { createdAt: "desc" },
+    take: 5,
   });
 }
 
@@ -287,10 +348,11 @@ export async function getDashboardStats() {
       staleCount: 0,
       pendingCount: 0,
       recentMessages: [],
+      setup: { hasWebhook: false, hasChannel: false, hasLinkedChannel: false },
     };
   }
 
-  const [totalMessages, deliveryCountsRaw, recentMessages] = await Promise.all([
+  const [totalMessages, deliveryCountsRaw, recentMessages, webhook, channel, link] = await Promise.all([
     prisma.message.count({
       where: { webhook: { organizationId: orgId } },
     }),
@@ -315,21 +377,16 @@ export async function getDashboardStats() {
       where: { webhook: { organizationId: orgId } },
       // Recent-messages card only shows title/webhook/status/time - omit the
       // payload JSONB and unused Delivery fields.
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        webhook: { select: { name: true } },
-        deliveries: {
-          select: {
-            id: true,
-            status: true,
-            channel: { select: { id: true, name: true, type: true } },
-          },
-        },
-      },
+      select: recentMessageSelect,
       orderBy: { createdAt: "desc" },
       take: 10,
+    }),
+    // Onboarding checklist: existence checks only.
+    prisma.webhook.findFirst({ where: { organizationId: orgId, deletedAt: null }, select: { id: true } }),
+    prisma.channel.findFirst({ where: { organizationId: orgId, deletedAt: null }, select: { id: true } }),
+    prisma.webhookChannel.findFirst({
+      where: { webhook: { organizationId: orgId, deletedAt: null }, channel: { deletedAt: null } },
+      select: { webhookId: true },
     }),
   ]);
 
@@ -347,5 +404,6 @@ export async function getDashboardStats() {
     staleCount,
     pendingCount,
     recentMessages,
+    setup: { hasWebhook: !!webhook, hasChannel: !!channel, hasLinkedChannel: !!link },
   };
 }

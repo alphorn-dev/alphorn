@@ -98,7 +98,7 @@ export default function EditWebhookForm({
         priorityTemplate: templates.priorityTemplate || null,
       });
       toast.success("Webhook updated");
-      router.push("/webhooks");
+      router.push(`/webhooks/${webhook.id}`);
     } catch (err) {
       showError(err, "Failed to update");
     } finally {
@@ -125,8 +125,8 @@ export default function EditWebhookForm({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Back to webhooks"
-          onClick={() => router.push("/webhooks")}
+          aria-label="Back to webhook"
+          onClick={() => router.push(`/webhooks/${webhook.id}`)}
         >
           <ArrowLeft data-icon />
         </Button>

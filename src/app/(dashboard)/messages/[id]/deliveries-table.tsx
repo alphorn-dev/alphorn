@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { getMessageDeliveries, resendDelivery } from "../actions";
+import { getMessageDeliveries, resendDelivery, resendFailedDeliveries } from "../actions";
 import { StatusBadge } from "@/components/status-badge";
 import { ExpandableError } from "@/components/expandable-error";
+import { ChannelIcon } from "@/components/channel-icons";
+import { DataTable, dataTableColumns } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { RotateCcw, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
+import { getChannelMeta } from "@/channels/meta";
 
 interface Delivery {
   id: string;
@@ -25,6 +20,12 @@ interface Delivery {
   attempts: number;
   lastError: string | null;
   channel: { id: string; name: string; type: string };
+}
+
+const col = dataTableColumns<Delivery>();
+
+function isInFlight(status: string) {
+  return status === "PENDING" || status === "PROCESSING";
 }
 
 export function DeliveriesTable({
@@ -40,11 +41,11 @@ export function DeliveriesTable({
 }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>(initialDeliveries);
   const [resending, setResending] = useState<Record<string, boolean>>({});
+  const [resendingAll, setResendingAll] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const hasPending = deliveries.some(
-    (d) => d.status === "PENDING" || d.status === "PROCESSING"
-  );
+  const hasPending = deliveries.some((d) => isInFlight(d.status));
+  const failedCount = deliveries.filter((d) => d.status === "FAILED" || d.status === "STALE").length;
 
   const loadDeliveries = useCallback(async () => {
     const data = await getMessageDeliveries(messageId);
@@ -58,7 +59,7 @@ export function DeliveriesTable({
     return () => clearInterval(interval);
   }, [hasPending, loadDeliveries]);
 
-  async function handleResend(deliveryId: string) {
+  const handleResend = useCallback(async (deliveryId: string) => {
     setResending((prev) => ({ ...prev, [deliveryId]: true }));
     try {
       await resendDelivery(deliveryId);
@@ -69,6 +70,19 @@ export function DeliveriesTable({
     } finally {
       setResending((prev) => ({ ...prev, [deliveryId]: false }));
     }
+  }, [loadDeliveries]);
+
+  async function handleResendAll() {
+    setResendingAll(true);
+    try {
+      const count = await resendFailedDeliveries(messageId);
+      toast.success(`${count} deliver${count === 1 ? "y" : "ies"} queued`);
+      await loadDeliveries();
+    } catch (err) {
+      showError(err, "Resend failed");
+    } finally {
+      setResendingAll(false);
+    }
   }
 
   async function handleRefresh() {
@@ -76,6 +90,81 @@ export function DeliveriesTable({
     await loadDeliveries();
     setRefreshing(false);
   }
+
+  const columns = useMemo(() => [
+    col.accessor((d) => d.channel.name, {
+      id: "channel",
+      header: "Channel",
+      size: 180,
+      enableSorting: true,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <Link href={`/channels/${row.original.channel.id}`} className="font-medium hover:underline">
+          {row.original.channel.name}
+        </Link>
+      ),
+    }),
+    col.accessor((d) => getChannelMeta(d.channel.type)?.displayName ?? d.channel.type, {
+      id: "type",
+      header: "Type",
+      size: 150,
+      enableSorting: true,
+      cell: ({ row, getValue }) => (
+        <span className="flex items-center gap-2 text-muted-foreground">
+          <ChannelIcon icon={row.original.channel.type} className="size-4 shrink-0" />
+          {getValue()}
+        </span>
+      ),
+    }),
+    col.accessor("status", {
+      header: "Status",
+      size: 110,
+      enableSorting: true,
+      cell: ({ getValue }) => <StatusBadge status={getValue()} />,
+    }),
+    col.accessor("attempts", {
+      header: "Attempts",
+      size: 90,
+      enableSorting: true,
+      cell: ({ getValue }) => <span className="tabular-nums">{getValue()}</span>,
+    }),
+    col.accessor("lastError", {
+      header: "Error",
+      size: 260,
+      meta: { className: "whitespace-normal" },
+      cell: ({ getValue }) => {
+        const error = getValue();
+        return error ? <ExpandableError error={error} /> : null;
+      },
+    }),
+    col.display({
+      id: "actions",
+      size: 130,
+      enableHiding: false,
+      enableResizing: false,
+      meta: { className: "text-right" },
+      cell: ({ row }) => {
+        const d = row.original;
+        return isInFlight(d.status) ? (
+          <Button size="sm" variant="outline" disabled className="gap-1">
+            <Loader2 data-icon="inline-start" className="animate-spin" />
+            Processing
+          </Button>
+        ) : isAdminOrOwner && canResend ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={resending[d.id]}
+            onClick={() => handleResend(d.id)}
+            className="gap-1"
+          >
+            <RotateCcw data-icon="inline-start" />
+            {resending[d.id] ? "Queuing..." : "Resend"}
+          </Button>
+        ) : null;
+      },
+    }),
+  ], [handleResend, resending, isAdminOrOwner, canResend]);
 
   if (deliveries.length === 0) {
     return (
@@ -86,74 +175,37 @@ export function DeliveriesTable({
   }
 
   return (
-    <div>
-      <div className="mb-3 flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="gap-1.5"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Channel</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Attempts</TableHead>
-          <TableHead>Error</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {deliveries.map((d) => (
-          <TableRow key={d.id}>
-            <TableCell className="font-medium">
-              <Link
-                href={`/channels/${d.channel.id}/edit`}
-                className="hover:underline"
-              >
-                {d.channel.name}
-              </Link>
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {d.channel.type}
-            </TableCell>
-            <TableCell>
-              <StatusBadge status={d.status} />
-            </TableCell>
-            <TableCell>{d.attempts}</TableCell>
-            <TableCell className="max-w-xs">
-              {d.lastError && <ExpandableError error={d.lastError} />}
-            </TableCell>
-            <TableCell className="text-right">
-              {d.status === "PENDING" || d.status === "PROCESSING" ? (
-                <Button size="sm" variant="outline" disabled className="gap-1">
-                  <Loader2 data-icon="inline-start" className="animate-spin" />
-                  Processing
-                </Button>
-              ) : isAdminOrOwner && canResend && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={resending[d.id]}
-                  onClick={() => handleResend(d.id)}
-                  className="gap-1"
-                >
-                  <RotateCcw data-icon="inline-start" />
-                  {resending[d.id] ? "Queuing..." : "Resend"}
-                </Button>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-    </div>
+    <DataTable
+      storageKey="deliveries"
+      columns={columns}
+      data={deliveries}
+      getRowId={(d) => d.id}
+      actions={
+        <>
+          {isAdminOrOwner && canResend && failedCount > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResendAll}
+              disabled={resendingAll}
+              className="gap-1.5"
+            >
+              <RotateCcw data-icon="inline-start" />
+              {resendingAll ? "Queuing..." : `Retry ${failedCount} failed`}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="gap-1.5"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </>
+      }
+    />
   );
 }

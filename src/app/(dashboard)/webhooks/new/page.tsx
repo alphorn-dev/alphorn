@@ -19,6 +19,7 @@ export default async function NewWebhookPage() {
     <NewWebhookForm
       channels={channels.map((c) => ({ id: c.id, name: c.name, type: c.type }))}
       availableTags={tags}
+      endpointBase={process.env.BETTER_AUTH_URL || "http://localhost:3000"}
     />
   );
 }

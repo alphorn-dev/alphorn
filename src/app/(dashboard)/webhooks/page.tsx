@@ -3,22 +3,13 @@ import { getWebhooksForOrg } from "./actions";
 import { getMemberRole, requireSession } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { WebhooksTable } from "./webhooks-table";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronDown, GitPullRequest, SquarePen, Webhook } from "lucide-react";
-import { formatDate } from "@/lib/format-date";
+import { ChevronDown, GitPullRequest, Webhook } from "lucide-react";
 import { githubAppConfig } from "@/lib/github/app";
 import {
   DropdownMenu,
@@ -159,70 +150,14 @@ export default async function WebhooksPage({
         </div>
       ) : (
         <div className="mt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Channels</TableHead>
-                <TableHead>Messages</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                {isAdminOrOwner && <TableHead className="w-[50px]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {webhooks.map((webhook) => (
-                <TableRow key={webhook.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/webhooks/${webhook.id}`}
-                      className="hover:underline"
-                    >
-                      {webhook.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {webhook.channels.length === 0 ? (
-                      <span className="text-muted-foreground">None</span>
-                    ) : (
-                      <div className="flex gap-1 flex-wrap">
-                        {webhook.channels.map((wc) => (
-                          <Link key={wc.channelId} href={`/channels/${wc.channelId}/edit`}>
-                            <Badge variant="secondary" className="hover:bg-accent">
-                              {wc.channel.name}
-                            </Badge>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{webhook._count.messages}</TableCell>
-                  <TableCell>
-                    {webhook.enabled ? (
-                      <Badge className="border-success/20 bg-success-muted text-success hover:bg-success-muted">
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">Disabled</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(webhook.createdAt)}
-                  </TableCell>
-                  {isAdminOrOwner && (
-                    <TableCell>
-                      <Link href={`/webhooks/${webhook.id}/edit`}>
-                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
-                          <SquarePen className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <WebhooksTable
+            webhooks={webhooks.map(({ githubInstallation, ...w }) => ({
+              ...w,
+              isGithub: githubInstallation !== null,
+            }))}
+            endpointBase={process.env.BETTER_AUTH_URL || "http://localhost:3000"}
+            isAdminOrOwner={isAdminOrOwner}
+          />
         </div>
       )}
     </div>

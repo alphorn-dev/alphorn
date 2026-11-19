@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Copy, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
 import { WebhookHostHint, webhookConflict as isWebhookConflict } from "@/components/webhook-host-hint";
@@ -76,7 +77,8 @@ export default function EditChannelForm({
     try {
       await updateChannel(initialChannel.id, { name, config, enabled });
       toast.success("Channel updated");
-      router.push("/channels");
+      // Stay here so the saved config can be checked with "Send test message".
+      router.refresh();
     } catch (err) {
       showError(err, "Failed to update");
     } finally {
@@ -115,8 +117,8 @@ export default function EditChannelForm({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Back to channels"
-          onClick={() => router.push("/channels")}
+          aria-label="Back to channel"
+          onClick={() => router.push(`/channels/${initialChannel.id}`)}
         >
           <ArrowLeft data-icon />
         </Button>
@@ -150,7 +152,7 @@ export default function EditChannelForm({
 
           {initialChannel.type === "sse" && connectionCount !== null && (
             <div className="flex items-center gap-2">
-              <span className={`inline-block size-2 rounded-full ${connectionCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+              <span className={`inline-block size-2 rounded-full ${connectionCount > 0 ? "bg-success" : "bg-muted-foreground/40"}`} />
               <span className="text-sm text-muted-foreground">
                 {connectionCount === 0
                   ? "No active connections"
@@ -166,18 +168,11 @@ export default function EditChannelForm({
                 <code className="flex-1 rounded-md border bg-muted px-3 py-2 text-sm font-mono break-all">
                   {`${origin}/api/stream/${publicId}`}
                 </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Copy stream URL"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${origin}/api/stream/${publicId}`);
-                    toast.success("Stream URL copied");
-                  }}
-                >
-                  <Copy data-icon />
-                </Button>
+                <CopyButton
+                  value={`${origin}/api/stream/${publicId}`}
+                  label="Copy stream URL"
+                  toastMessage="Stream URL copied"
+                />
                 <ConfirmDialog
                   trigger={
                     <Button type="button" variant="outline" size="icon" aria-label="Regenerate stream URL">

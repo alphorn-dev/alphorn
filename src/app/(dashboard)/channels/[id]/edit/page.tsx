@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getMemberRole } from "@/lib/auth/server";
 import { getChannelById } from "../../actions";
 import EditChannelForm from "./edit-channel-form";
+import { BreadcrumbLabel } from "@/components/breadcrumbs";
 
 export default async function EditChannelPage({
   params,
@@ -21,6 +22,8 @@ export default async function EditChannelPage({
   }
 
   return (
+    <>
+    <BreadcrumbLabel segment={channel.id} label={channel.name} />
     <EditChannelForm
       appUrl={process.env.BETTER_AUTH_URL!}
       initialChannel={{
@@ -32,5 +35,6 @@ export default async function EditChannelPage({
         publicId: channel.publicId,
       }}
     />
+    </>
   );
 }

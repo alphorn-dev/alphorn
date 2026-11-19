@@ -1,25 +1,14 @@
 import Link from "next/link";
 import { getChannelsForOrg } from "./actions";
-import { getAllChannelMeta } from "@/channels/meta";
 import { getMemberRole, requireSession } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ChannelsTable } from "./channels-table";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatDate } from "@/lib/format-date";
-import { SquarePen } from "lucide-react";
 
 export default async function ChannelsPage() {
   const session = await requireSession();
@@ -29,7 +18,6 @@ export default async function ChannelsPage() {
     getMemberRole(),
     orgId ? getOrgLimits(orgId) : Promise.resolve(null),
   ]);
-  const handlers = getAllChannelMeta();
   const isAdminOrOwner = role === "owner" || role === "admin";
   const channelLimit = limits?.channels ?? null;
   const limitReached =
@@ -75,56 +63,7 @@ export default async function ChannelsPage() {
         </div>
       ) : (
         <div className="mt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                {isAdminOrOwner && <TableHead className="w-[50px]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {channels.map((channel) => {
-                const handler = handlers.find((h) => h.type === channel.type);
-                return (
-                  <TableRow key={channel.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/channels/${channel.id}/edit`} className="hover:underline">
-                        {channel.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {handler?.displayName || channel.type}
-                    </TableCell>
-                    <TableCell>
-                      {channel.enabled ? (
-                        <Badge className="border-success/20 bg-success-muted text-success hover:bg-success-muted">
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">Disabled</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {formatDate(channel.createdAt)}
-                    </TableCell>
-                    {isAdminOrOwner && (
-                      <TableCell>
-                        <Link href={`/channels/${channel.id}/edit`}>
-                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
-                            <SquarePen className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <ChannelsTable channels={channels} isAdminOrOwner={isAdminOrOwner} />
         </div>
       )}
     </div>

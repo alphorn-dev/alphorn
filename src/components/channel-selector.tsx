@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -54,9 +55,9 @@ export function ChannelSelector({
     return (
       <p className="text-sm text-muted-foreground">
         No channels configured yet.{" "}
-        <a href="/channels/new" className="text-primary underline">
+        <Link href="/channels/new" className="text-primary underline">
           Create one first
-        </a>
+        </Link>
       </p>
     );
   }

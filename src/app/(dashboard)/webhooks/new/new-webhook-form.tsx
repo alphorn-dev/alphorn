@@ -22,7 +22,8 @@ import {
   type MessageTemplates,
 } from "@/components/message-format-fields";
 import type { ExtractMode } from "@/lib/webhook-extract/mode";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
 import { type ChannelSelection, validateFilter } from "@/lib/filter/schema";
@@ -31,9 +32,11 @@ import type { ChannelOption } from "@/channels/types";
 export default function NewWebhookForm({
   channels,
   availableTags,
+  endpointBase,
 }: {
   channels: ChannelOption[];
   availableTags: string[];
+  endpointBase: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -44,7 +47,7 @@ export default function NewWebhookForm({
   const [templates, setTemplates] = useState<MessageTemplates>(EMPTY_TEMPLATES);
   const [saving, setSaving] = useState(false);
   // Set once the webhook is created; holds the one-time plaintext key to reveal.
-  const [created, setCreated] = useState<{ id: string; apiKey: string | null } | null>(null);
+  const [created, setCreated] = useState<{ id: string; apiKey: string | null; publicId: string } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,7 +62,7 @@ export default function NewWebhookForm({
 
     setSaving(true);
     try {
-      const { id, apiKey } = await createWebhook({
+      const { id, apiKey, publicId } = await createWebhook({
         name,
         description: description || undefined,
         requireAuth,
@@ -76,17 +79,12 @@ export default function NewWebhookForm({
       toast.success("Webhook created");
       // The plaintext key is returned once and never stored - reveal it here
       // before moving on. If auth is off, there is no key to show.
-      setCreated({ id, apiKey: requireAuth ? apiKey : null });
+      setCreated({ id, apiKey: requireAuth ? apiKey : null, publicId });
     } catch (err) {
       showError(err, "Failed to create webhook");
     } finally {
       setSaving(false);
     }
-  }
-
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
   }
 
   if (created) {
@@ -102,6 +100,17 @@ export default function NewWebhookForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Endpoint URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={`${endpointBase}/n/${created.publicId}`}
+                  readOnly
+                  className="font-mono text-sm"
+                />
+                <CopyButton value={`${endpointBase}/n/${created.publicId}`} label="Copy endpoint URL" />
+              </div>
+            </div>
             {created.apiKey && (
               <div className="space-y-2">
                 <Label>API Key</Label>
@@ -111,14 +120,7 @@ export default function NewWebhookForm({
                     readOnly
                     className="font-mono text-sm"
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(created.apiKey!)}
-                    title="Copy"
-                  >
-                    <Copy data-icon />
-                  </Button>
+                  <CopyButton value={created.apiKey} label="Copy API key" />
                 </div>
                 <p className="text-sm text-warning">
                   Store it somewhere safe now. You can regenerate it later, but

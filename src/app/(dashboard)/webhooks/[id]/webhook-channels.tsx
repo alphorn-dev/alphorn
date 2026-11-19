@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { getChannelMeta } from "@/channels/meta";
 import { updateWebhookChannels, toggleWebhookChannel } from "../actions";
 import { getChannelsForOrg } from "../../channels/actions";
 import { getAllTagsForOrg } from "../../messages/actions";
@@ -166,12 +168,9 @@ export function WebhookChannels({ webhookId, channels: initialChannels, isAdminO
           <p className="text-sm text-muted-foreground">
             No channels linked.{" "}
             {isAdminOrOwner && (
-              <button
-                onClick={startEditing}
-                className="text-primary underline"
-              >
+              <Button variant="link" className="h-auto p-0" onClick={startEditing}>
                 Add channels
-              </button>
+              </Button>
             )}
           </p>
         ) : (
@@ -183,8 +182,15 @@ export function WebhookChannels({ webhookId, channels: initialChannels, isAdminO
               >
                 <ChannelIcon icon={wc.channel.type} className="h-5 w-5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-none">{wc.channel.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{wc.channel.type}</p>
+                  <Link
+                    href={`/channels/${wc.channelId}`}
+                    className="block truncate text-sm font-medium leading-none hover:underline"
+                  >
+                    {wc.channel.name}
+                  </Link>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {getChannelMeta(wc.channel.type)?.displayName ?? wc.channel.type}
+                  </p>
                 </div>
                 {wc.filter ? (
                   <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { requireSession, requireAdminOrOwner } from "@/lib/auth/server";
+import { requireSession, requireOrgSession, requireAdminOrOwner } from "@/lib/auth/server";
 import { getOrgLimits } from "@/lib/billing/subscription";
 import { getChannel } from "@/channels";
 import { generateChannelId, generatePublicId } from "@/lib/api-key";
@@ -26,8 +26,65 @@ export async function getChannelsForOrg() {
       type: true,
       enabled: true,
       createdAt: true,
+      webhooks: {
+        where: { webhook: { deletedAt: null } },
+        select: { webhook: { select: { id: true, name: true } } },
+      },
     },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+const CHANNEL_STATS_DAYS = 30;
+
+/** Delivery counts and the most recent failure for a channel, last CHANNEL_STATS_DAYS. */
+export async function getChannelDeliveryStats(channelId: string) {
+  const { orgId } = await requireOrgSession();
+  const since = new Date(Date.now() - CHANNEL_STATS_DAYS * 24 * 60 * 60 * 1000);
+  const where = { channelId, channel: { organizationId: orgId }, createdAt: { gte: since } };
+
+  const [groups, lastFailure] = await Promise.all([
+    prisma.delivery.groupBy({ by: ["status"], where, _count: { _all: true } }),
+    prisma.delivery.findFirst({
+      where: { ...where, status: { in: ["FAILED", "STALE"] } },
+      select: { lastError: true, updatedAt: true, messageId: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
+
+  const count = (...statuses: string[]) =>
+    groups.filter((g) => statuses.includes(g.status)).reduce((n, g) => n + g._count._all, 0);
+  const delivered = count("DELIVERED");
+  const failed = count("FAILED", "STALE");
+  const finished = delivered + failed;
+  return {
+    days: CHANNEL_STATS_DAYS,
+    delivered,
+    failed,
+    pending: count("PENDING", "PROCESSING"),
+    // Rate over finished deliveries only; in-flight ones have no outcome yet.
+    successRate: finished > 0 ? Math.round((delivered / finished) * 1000) / 10 : null,
+    lastFailure,
+  };
+}
+
+/** Read-only channel summary for any member: no config (credentials). */
+export async function getChannelSummary(id: string) {
+  const { orgId } = await requireOrgSession();
+
+  return prisma.channel.findFirst({
+    where: { id, organizationId: orgId, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      enabled: true,
+      createdAt: true,
+      webhooks: {
+        where: { webhook: { deletedAt: null } },
+        select: { enabled: true, filter: true, webhook: { select: { id: true, name: true, enabled: true } } },
+      },
+    },
   });
 }
 

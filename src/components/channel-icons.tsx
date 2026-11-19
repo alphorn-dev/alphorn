@@ -1,5 +1,6 @@
 import type { SVGProps } from "react";
 import { Forward } from "lucide-react";
+import { getChannelMeta } from "@/channels/meta";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -305,11 +306,14 @@ const iconMap: Record<string, React.FC<IconProps>> = {
 };
 
 interface ChannelIconProps extends IconProps {
+  /** Icon key from channel meta, or a channel type (resolved via its meta). */
   icon: string;
 }
 
 export function ChannelIcon({ icon, ...props }: ChannelIconProps) {
-  const Icon = iconMap[icon];
+  // Callers often pass the channel type; a few types use a different icon key
+  // (smtp -> email, teams -> microsoft-teams, ...).
+  const Icon = iconMap[icon] ?? iconMap[getChannelMeta(icon)?.icon ?? ""];
   if (!Icon) return null;
   return <Icon {...props} />;
 }

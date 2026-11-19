@@ -1,26 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useTransition } from "react";
 import Link from "next/link";
-import { StatusBadge } from "@/components/status-badge";
+import { DataTable, dataTableColumns } from "@/components/data-table";
+import { DeliveryBadges } from "@/components/delivery-badges";
+import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDateTime } from "@/lib/format-date";
 import { RefreshCw } from "lucide-react";
 
 interface RecentMessage {
   id: string;
   title: string | null;
   createdAt: Date;
-  webhook: { name: string };
+  webhook: { id: string; name: string; deletedAt: Date | null };
   deliveries: {
     id: string;
     status: string;
@@ -28,84 +21,110 @@ interface RecentMessage {
   }[];
 }
 
+const col = dataTableColumns<RecentMessage>();
+const columns = [
+  col.accessor("title", {
+    header: "Title",
+    size: 280,
+    enableHiding: false,
+    cell: ({ row }) => (
+      <Link href={`/messages/${row.original.id}`} className="font-medium hover:underline">
+        {row.original.title ?? <span className="pr-0.5 text-muted-foreground italic">Untitled</span>}
+      </Link>
+    ),
+  }),
+  col.accessor((m) => m.webhook.name, {
+    id: "webhook",
+    header: "Webhook",
+    size: 180,
+    enableHiding: false,
+    cell: ({ row }) => {
+      const wh = row.original.webhook;
+      return wh.deletedAt ? (
+        <span className="text-muted-foreground">{wh.name}</span>
+      ) : (
+        <Link href={`/webhooks/${wh.id}`} className="text-muted-foreground hover:text-foreground hover:underline">
+          {wh.name}
+        </Link>
+      );
+    },
+  }),
+  col.accessor("deliveries", {
+    header: "Deliveries",
+    size: 200,
+    enableHiding: false,
+    cell: ({ getValue }) => <DeliveryBadges deliveries={getValue()} />,
+  }),
+  col.accessor("createdAt", {
+    header: "Time",
+    size: 140,
+    enableHiding: false,
+    cell: ({ getValue }) => (
+      <span className="text-muted-foreground">
+        <RelativeTime date={getValue()} />
+      </span>
+    ),
+  }),
+];
+
+/** Recent messages card body; also used on a webhook's page (`hideWebhook`). */
 export function DashboardRecentMessages({
   messages,
+  hideWebhook = false,
+  showAllHref = "/messages",
+  emptyText = "No messages yet. Create a webhook and send your first notification.",
 }: {
   messages: RecentMessage[];
+  hideWebhook?: boolean;
+  showAllHref?: string;
+  emptyText?: string;
 }) {
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, startTransition] = useTransition();
 
-  function refresh() {
-    setRefreshing(true);
-    router.refresh();
-    setTimeout(() => setRefreshing(false), 500);
-  }
+  // Keep the card live while deliveries are still in flight.
+  const hasInFlight = messages.some((m) =>
+    m.deliveries.some((d) => d.status === "PENDING" || d.status === "PROCESSING"),
+  );
+  useEffect(() => {
+    if (!hasInFlight) return;
+    const interval = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(interval);
+  }, [hasInFlight, router]);
+
+  const visibleColumns = useMemo(
+    () => (hideWebhook ? columns.filter((c) => c.id !== "webhook") : columns),
+    [hideWebhook],
+  );
 
   if (messages.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No messages yet. Create a webhook and send your first notification.
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">{emptyText}</p>;
   }
 
   return (
     <div>
-      <div className="mb-3 flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={refresh}
-          disabled={refreshing}
-          className="gap-1.5"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Webhook</TableHead>
-            <TableHead>Deliveries</TableHead>
-            <TableHead>Time</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {messages.map((msg) => (
-            <TableRow key={msg.id}>
-              <TableCell>
-                <Link
-                  href={`/messages/${msg.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {msg.title ?? <span className="text-muted-foreground italic">Untitled</span>}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {msg.webhook.name}
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-1 flex-wrap">
-                  {msg.deliveries.map((d) => (
-                    <Link key={d.id} href={`/channels/${d.channel.id}/edit`} title={d.channel.name}>
-                      <StatusBadge status={d.status} />
-                    </Link>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {formatDateTime(msg.createdAt)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable
+        storageKey={hideWebhook ? "webhook-recent" : "dashboard-recent"}
+        columns={visibleColumns}
+        data={messages}
+        getRowId={(m) => m.id}
+        rowHref={(m) => `/messages/${m.id}`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => startTransition(() => router.refresh())}
+            disabled={refreshing}
+            className="gap-1.5"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
       <div className="mt-4 text-center">
         <Link
-          href="/messages"
+          href={showAllHref}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           Show all messages &rarr;

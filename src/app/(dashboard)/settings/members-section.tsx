@@ -14,6 +14,8 @@ import {
   transferOwnership,
 } from "./members-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CopyButton } from "@/components/copy-button";
+import { DataTable, dataTableColumns } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -42,7 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserPlus, X, Link2, Copy, Trash2, Crown } from "lucide-react";
+import { UserPlus, X, Link2, Trash2, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
 
@@ -51,6 +53,8 @@ interface Member {
   role: string;
   user: { id: string; name: string; email: string };
 }
+
+const memberCol = dataTableColumns<Member>();
 
 interface Invitation {
   id: string;
@@ -183,12 +187,6 @@ export function MembersSection({
     }
   }
 
-  function copyLink(token: string) {
-    const baseUrl = window.location.origin;
-    navigator.clipboard.writeText(`${baseUrl}/invite/${token}`);
-    toast.success("Link copied to clipboard");
-  }
-
   function getLinkStatus(link: InviteLinkData) {
     if (link.usedAt) return "used";
     if (new Date(link.expiresAt) < new Date()) return "expired";
@@ -223,6 +221,99 @@ export function MembersSection({
     </div>
   );
 
+  const callerIsOwner = callerRole === "owner";
+  const memberColumns = [
+    memberCol.accessor((m) => m.user.name, {
+      id: "name",
+      header: "Name",
+      size: 200,
+      enableSorting: true,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.user.name}
+          {row.original.user.id === currentUserId && (
+            <span className="text-muted-foreground ml-1">(you)</span>
+          )}
+        </span>
+      ),
+    }),
+    memberCol.accessor((m) => m.user.email, {
+      id: "email",
+      header: "Email",
+      size: 240,
+      enableSorting: true,
+      cell: ({ getValue }) => <span className="text-muted-foreground">{getValue()}</span>,
+    }),
+    memberCol.accessor("role", {
+      header: "Role",
+      size: 120,
+      enableSorting: true,
+      cell: ({ row }) => {
+        const m = row.original;
+        return m.role === "owner" || m.user.id === currentUserId ? (
+          <Badge variant="secondary">{m.role}</Badge>
+        ) : (
+          <Select
+            value={m.role}
+            onValueChange={(v) => v && handleRoleChange(m.id, v)}
+          >
+            <SelectTrigger className="w-24 h-7 text-xs">
+              <SelectValue>{m.role === "admin" ? "Admin" : "Member"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+      },
+    }),
+    memberCol.display({
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      size: 130,
+      enableHiding: false,
+      enableResizing: false,
+      meta: { className: "text-right" },
+      cell: ({ row }) => {
+        const m = row.original;
+        const isSelf = m.user.id === currentUserId;
+        const isOwner = m.role === "owner";
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {callerIsOwner && !isSelf && !isOwner && (
+              <ConfirmDialog
+                trigger={
+                  <Button variant="ghost" size="icon-sm" title="Transfer ownership">
+                    <Crown className="h-4 w-4" />
+                  </Button>
+                }
+                title="Transfer ownership?"
+                description={`${m.user.name} will become the owner and you will be demoted to admin. This cannot be undone.`}
+                confirmLabel="Transfer"
+                onConfirm={() => handleTransferOwnership(m.id)}
+              />
+            )}
+            {!isOwner && !isSelf && (
+              <ConfirmDialog
+                trigger={
+                  <Button variant="ghost" size="sm">
+                    Remove
+                  </Button>
+                }
+                title="Remove member?"
+                description={`${m.user.name} will lose access to this project.`}
+                confirmLabel="Remove"
+                onConfirm={() => handleRemove(m.id)}
+              />
+            )}
+          </div>
+        );
+      },
+    }),
+  ];
+
   return (
     <div className="space-y-6">
       <Card>
@@ -236,85 +327,13 @@ export function MembersSection({
           {members.length === 0 ? (
             <p className="text-sm text-muted-foreground">No members yet.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {members.map((m) => {
-                  const isSelf = m.user.id === currentUserId;
-                  const isOwner = m.role === "owner";
-                  const callerIsOwner = callerRole === "owner";
-
-                  return (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">
-                        {m.user.name}
-                        {isSelf && (
-                          <span className="text-muted-foreground ml-1">(you)</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {m.user.email}
-                      </TableCell>
-                      <TableCell>
-                        {isOwner || isSelf ? (
-                          <Badge variant="secondary">{m.role}</Badge>
-                        ) : (
-                          <Select
-                            value={m.role}
-                            onValueChange={(v) => v && handleRoleChange(m.id, v)}
-                          >
-                            <SelectTrigger className="w-24 h-7 text-xs">
-                              <SelectValue>{m.role === "admin" ? "Admin" : "Member"}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="member">Member</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {callerIsOwner && !isSelf && !isOwner && (
-                            <ConfirmDialog
-                              trigger={
-                                <Button variant="ghost" size="icon-sm" title="Transfer ownership">
-                                  <Crown className="h-4 w-4" />
-                                </Button>
-                              }
-                              title="Transfer ownership?"
-                              description={`${m.user.name} will become the owner and you will be demoted to admin. This cannot be undone.`}
-                              confirmLabel="Transfer"
-                              onConfirm={() => handleTransferOwnership(m.id)}
-                            />
-                          )}
-                          {!isOwner && !isSelf && (
-                            <ConfirmDialog
-                              trigger={
-                                <Button variant="ghost" size="sm">
-                                  Remove
-                                </Button>
-                              }
-                              title="Remove member?"
-                              description={`${m.user.name} will lose access to this project.`}
-                              confirmLabel="Remove"
-                              onConfirm={() => handleRemove(m.id)}
-                            />
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <DataTable
+              storageKey="members"
+              columns={memberColumns}
+              data={members}
+              getRowId={(m) => m.id}
+              initialSorting={[{ id: "name", desc: false }]}
+            />
           )}
         </CardContent>
       </Card>
@@ -456,14 +475,13 @@ export function MembersSection({
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           {status === "active" && (
-                            <Button
+                            <CopyButton
+                              // Rows only render after the client-side fetch, so window exists.
+                              value={`${window.location.origin}/invite/${link.token}`}
+                              label="Copy link"
+                              toastMessage="Link copied to clipboard"
                               variant="ghost"
-                              size="icon"
-                              onClick={() => copyLink(link.token)}
-                              title="Copy link"
-                            >
-                              <Copy data-icon />
-                            </Button>
+                            />
                           )}
                           <ConfirmDialog
                             trigger={

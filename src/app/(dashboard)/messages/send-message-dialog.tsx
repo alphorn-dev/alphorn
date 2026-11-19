@@ -26,17 +26,27 @@ import { Badge } from "@/components/ui/badge";
 import { Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { showError } from "@/lib/toast-error";
+import { PRIORITY_LABELS, PRIORITY_OPTIONS } from "@/lib/filter/schema";
 
 interface Webhook {
   id: string;
   name: string;
 }
 
-export function SendMessageDialog() {
+/** Without `webhook` the user picks one; with it, the message goes to that webhook. */
+export function SendMessageDialog({
+  webhook,
+  variant = "default",
+  label = "Send message",
+}: {
+  webhook?: Webhook;
+  variant?: "default" | "outline";
+  label?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
-  const [webhookId, setWebhookId] = useState("");
+  const [webhookId, setWebhookId] = useState(webhook?.id ?? "");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [priority, setPriority] = useState("");
@@ -46,7 +56,7 @@ export function SendMessageDialog() {
 
   function handleOpenChange(isOpen: boolean) {
     setOpen(isOpen);
-    if (isOpen) {
+    if (isOpen && !webhook) {
       getWebhooksForSend().then(setWebhooks);
     }
   }
@@ -87,7 +97,7 @@ export function SendMessageDialog() {
       setPriority("");
       setTagInput("");
       setTags([]);
-      setWebhookId("");
+      setWebhookId(webhook?.id ?? "");
       router.push(`/messages/${messageId}`);
     } catch (err) {
       showError(err, "Failed to send");
@@ -98,45 +108,49 @@ export function SendMessageDialog() {
 
   return (
     <>
-      <Button onClick={() => handleOpenChange(true)} className="gap-2">
+      <Button variant={variant} onClick={() => handleOpenChange(true)} className="gap-2">
         <Send data-icon="inline-start" />
-        Send message
+        {label}
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Send a message</DialogTitle>
             <DialogDescription>
-              Send a test notification through a webhook.
+              {webhook
+                ? `Send a test notification through ${webhook.name}.`
+                : "Send a test notification through a webhook."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSend}>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Webhook</Label>
-                <Select
-                  value={webhookId}
-                  onValueChange={(v) => setWebhookId(v || "")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a webhook...">
-                      {webhooks.find((w) => w.id === webhookId)?.name}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {webhooks.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {webhooks.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No webhooks available. Create one first.
-                  </p>
-                )}
-              </div>
+              {!webhook && (
+                <div className="space-y-2">
+                  <Label>Webhook</Label>
+                  <Select
+                    value={webhookId}
+                    onValueChange={(v) => setWebhookId(v || "")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a webhook...">
+                        {webhooks.find((w) => w.id === webhookId)?.name}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {webhooks.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {webhooks.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No webhooks available. Create one first.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="msg-title">Title</Label>
                 <Input
@@ -163,15 +177,15 @@ export function SendMessageDialog() {
                 <Select value={priority} onValueChange={(v) => setPriority(v ?? "")}>
                   <SelectTrigger id="msg-priority">
                     <SelectValue placeholder="None">
-                      {{"1": "1 - Min", "2": "2 - Low", "3": "3 - Default", "4": "4 - High", "5": "5 - Urgent"}[priority] ?? "None"}
+                      {priority ? `${priority} - ${PRIORITY_LABELS[Number(priority)]}` : "None"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 - Min</SelectItem>
-                    <SelectItem value="2">2 - Low</SelectItem>
-                    <SelectItem value="3">3 - Default</SelectItem>
-                    <SelectItem value="4">4 - High</SelectItem>
-                    <SelectItem value="5">5 - Urgent</SelectItem>
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <SelectItem key={p.value} value={String(p.value)}>
+                        {p.value} - {p.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

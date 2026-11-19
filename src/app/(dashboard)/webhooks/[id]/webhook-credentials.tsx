@@ -14,7 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Copy, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { CopyButton } from "@/components/copy-button";
 import { toast } from "sonner";
 
 export function WebhookCredentials({
@@ -73,11 +74,6 @@ export function WebhookCredentials({
     }
   }
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -91,14 +87,7 @@ export function WebhookCredentials({
           <Label>Endpoint URL</Label>
           <div className="flex gap-2">
             <Input value={endpointUrl} readOnly className="font-mono text-sm" />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => copyToClipboard(endpointUrl)}
-              title="Copy"
-            >
-              <Copy data-icon />
-            </Button>
+            <CopyButton value={endpointUrl} label="Copy endpoint URL" />
           </div>
           <ConfirmDialog
             trigger={
@@ -139,14 +128,7 @@ export function WebhookCredentials({
                     readOnly
                     className="font-mono text-sm"
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(revealedKey)}
-                    title="Copy"
-                  >
-                    <Copy data-icon />
-                  </Button>
+                  <CopyButton value={revealedKey} label="Copy API key" />
                 </div>
                 <p className="text-sm text-warning">
                   Copy this key now - it is shown only once and cannot be
