@@ -1,6 +1,6 @@
 services:
   alphorn:
-    image: ghcr.io/alphorn-dev/alphorn:1.7.1
+    image: ghcr.io/alphorn-dev/alphorn:1.7.2
     restart: unless-stopped
     expose:
       - "3000"
